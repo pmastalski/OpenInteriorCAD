@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Open-source semantic CAD platform for interior and furniture design"
 requires-python = ">=3.11"
 
+[project.scripts]
+openinteriorcad = "openinteriorcad.desktop.app:run"
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
