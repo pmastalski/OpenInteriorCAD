@@ -1,3 +1,5 @@
+from openinteriorcad.commands.history import CommandHistory
+from openinteriorcad.commands.move_vertex import MoveVertexCommand
 from openinteriorcad.domain.room import Room
 from openinteriorcad.domain.vertex2d import Vertex2D
 from openinteriorcad.domain.wall import Wall
@@ -93,3 +95,28 @@ def test_shared_vertex_updates_two_walls():
 
     assert wall_1.length == 4500
     assert wall_2.start == Point2D(4500, 0)
+
+def test_move_vertex_command_updates_connected_walls():
+    room = create_rectangular_room()
+
+    wall_1 = room.walls[0]
+    wall_2 = room.walls[1]
+
+    shared_vertex = wall_1.end_vertex
+
+    history = CommandHistory()
+
+    history.execute(
+        MoveVertexCommand(
+            shared_vertex,
+            Point2D(4500, 0),
+        )
+    )
+
+    assert wall_1.length == 4500
+    assert wall_2.start == Point2D(4500, 0)
+
+    history.undo()
+
+    assert wall_1.length == 4000
+    assert wall_2.start == Point2D(4000, 0)
