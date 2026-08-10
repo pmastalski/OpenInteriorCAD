@@ -1,0 +1,2 @@
+[console_scripts]
+openinteriorcad = openinteriorcad.desktop.app:run
