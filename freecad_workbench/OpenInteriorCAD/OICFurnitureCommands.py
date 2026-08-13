@@ -2,16 +2,97 @@
 
 import FreeCAD as App
 import FreeCADGui as Gui
+from OICFurnitureDuplicatePanel import (
+    FurnitureDuplicatePanel,
+)
 from PySide import QtWidgets
 
 from OICFurniture import create_furniture
 from OICFurnitureEditPanel import FurnitureEditPanel
-from OICFurnitureMove import FurnitureMoveTool
+
+from OICFurnitureMovePanel import (
+    FurnitureMovePanel,
+)
+
 from OICFurniturePanel import FurniturePanel
+from OICFurnitureSnapFurniture import (
+    FurnitureSnapFurnitureTool,
+)
+from OICFurnitureSnapWall import (
+    FurnitureSnapWallTool,
+)
 
 
 ACTIVE_FURNITURE_TOOL = None
 ACTIVE_MOVE_TOOL = None
+ACTIVE_SNAP_TOOL = None
+
+
+def get_selected_furniture(title):
+    """Return one selected furniture object."""
+
+    selection = Gui.Selection.getSelection()
+
+    if len(selection) != 1:
+        QtWidgets.QMessageBox.warning(
+            Gui.getMainWindow(),
+            title,
+            "Zaznacz dokładnie jeden mebel.",
+        )
+        return None
+
+    furniture = selection[0]
+
+    if (
+        getattr(
+            furniture,
+            "OICType",
+            "",
+        )
+        != "OpenInteriorCAD::Furniture"
+    ):
+        QtWidgets.QMessageBox.warning(
+            Gui.getMainWindow(),
+            title,
+            "Zaznaczony obiekt nie jest meblem.",
+        )
+        return None
+
+    return furniture
+
+
+def stop_active_tools():
+    """Stop all active furniture tools."""
+
+    global ACTIVE_FURNITURE_TOOL
+    global ACTIVE_MOVE_TOOL
+    global ACTIVE_SNAP_TOOL
+
+    if (
+        ACTIVE_FURNITURE_TOOL is not None
+        and ACTIVE_FURNITURE_TOOL.active
+    ):
+        ACTIVE_FURNITURE_TOOL.stop(
+            close_panel=True
+        )
+
+    ACTIVE_FURNITURE_TOOL = None
+
+    if (
+        ACTIVE_MOVE_TOOL is not None
+        and ACTIVE_MOVE_TOOL.active
+    ):
+        ACTIVE_MOVE_TOOL.stop()
+
+    ACTIVE_MOVE_TOOL = None
+
+    if (
+        ACTIVE_SNAP_TOOL is not None
+        and ACTIVE_SNAP_TOOL.active
+    ):
+        ACTIVE_SNAP_TOOL.stop()
+
+    ACTIVE_SNAP_TOOL = None
 
 
 class FurniturePlacementTool:
@@ -50,7 +131,6 @@ class FurniturePlacementTool:
         self.view = gui_document.activeView()
 
         self.active = True
-
         ACTIVE_FURNITURE_TOOL = self
 
         self.panel = FurniturePanel(
@@ -121,7 +201,6 @@ class FurniturePlacementTool:
                 "OpenInteriorCAD furniture point error: "
                 f"{error}\n"
             )
-
             return
 
         self.waiting_for_point = False
@@ -159,7 +238,6 @@ class FurniturePlacementTool:
                 "OpenInteriorCAD: błąd wstawiania mebla: "
                 f"{error}\n"
             )
-
             return
 
         Gui.Selection.clearSelection()
@@ -183,7 +261,6 @@ class FurniturePlacementTool:
                     "SoMouseButtonEvent",
                     self.callback,
                 )
-
             except Exception:
                 pass
 
@@ -210,11 +287,11 @@ class FurniturePlacementTool:
 
 
 class AddFurnitureCommand:
-    """Insert parametric cabinet."""
+    """Insert a parametric cabinet."""
 
     def GetResources(self):
         return {
-            "MenuText": "Wstaw szafkę",
+            "MenuText": "Add Cabinet",
             "ToolTip": (
                 "Wstawia parametryczną szafkę."
             ),
@@ -224,17 +301,7 @@ class AddFurnitureCommand:
         return True
 
     def Activated(self):
-        global ACTIVE_FURNITURE_TOOL
-
-        if (
-            ACTIVE_FURNITURE_TOOL is not None
-            and ACTIVE_FURNITURE_TOOL.active
-        ):
-            ACTIVE_FURNITURE_TOOL.stop(
-                close_panel=True
-            )
-
-            return
+        stop_active_tools()
 
         if Gui.Control.activeDialog():
             Gui.Control.closeDialog()
@@ -249,10 +316,10 @@ class EditFurnitureCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Edytuj mebel",
+            "MenuText": "Edit Furniture",
             "ToolTip": (
                 "Edytuje wymiary, położenie "
-                "i obrót mebla."
+                "i obrót zaznaczonego mebla."
             ),
         }
 
@@ -260,46 +327,16 @@ class EditFurnitureCommand:
         return True
 
     def Activated(self):
-        global ACTIVE_FURNITURE_TOOL
-
-        if (
-            ACTIVE_FURNITURE_TOOL is not None
-            and ACTIVE_FURNITURE_TOOL.active
-        ):
-            ACTIVE_FURNITURE_TOOL.stop(
-                close_panel=True
-            )
+        stop_active_tools()
 
         if Gui.Control.activeDialog():
             Gui.Control.closeDialog()
 
-        selection = Gui.Selection.getSelection()
+        furniture = get_selected_furniture(
+            "Edytuj mebel"
+        )
 
-        if len(selection) != 1:
-            QtWidgets.QMessageBox.warning(
-                Gui.getMainWindow(),
-                "Edytuj mebel",
-                "Zaznacz dokładnie jeden mebel.",
-            )
-
-            return
-
-        furniture = selection[0]
-
-        if (
-            getattr(
-                furniture,
-                "OICType",
-                "",
-            )
-            != "OpenInteriorCAD::Furniture"
-        ):
-            QtWidgets.QMessageBox.warning(
-                Gui.getMainWindow(),
-                "Edytuj mebel",
-                "Zaznaczony obiekt nie jest meblem.",
-            )
-
+        if furniture is None:
             return
 
         panel = FurnitureEditPanel(
@@ -310,16 +347,15 @@ class EditFurnitureCommand:
             panel
         )
 
-
 class MoveFurnitureCommand:
-    """Move selected furniture interactively."""
+    """Open precise furniture movement panel."""
 
     def GetResources(self):
         return {
-            "MenuText": "Przesuń mebel",
+            "MenuText": "Move Furniture",
             "ToolTip": (
-                "Przesuwa zaznaczony mebel "
-                "i przyciąga go do ściany."
+                "Precisely move, nudge and position "
+                "the selected furniture."
             ),
         }
 
@@ -327,66 +363,132 @@ class MoveFurnitureCommand:
         return True
 
     def Activated(self):
-        global ACTIVE_MOVE_TOOL
-        global ACTIVE_FURNITURE_TOOL
-
-        if (
-            ACTIVE_FURNITURE_TOOL is not None
-            and ACTIVE_FURNITURE_TOOL.active
-        ):
-            ACTIVE_FURNITURE_TOOL.stop(
-                close_panel=True
-            )
-
-        if (
-            ACTIVE_MOVE_TOOL is not None
-            and ACTIVE_MOVE_TOOL.active
-        ):
-            ACTIVE_MOVE_TOOL.stop()
-            ACTIVE_MOVE_TOOL = None
-
-            return
+        stop_active_tools()
 
         if Gui.Control.activeDialog():
             Gui.Control.closeDialog()
 
-        selection = Gui.Selection.getSelection()
+        furniture = get_selected_furniture(
+            "Move Furniture"
+        )
 
-        if len(selection) != 1:
-            QtWidgets.QMessageBox.warning(
-                Gui.getMainWindow(),
-                "Przesuń mebel",
-                "Zaznacz dokładnie jeden mebel.",
-            )
-
+        if furniture is None:
             return
 
-        furniture = selection[0]
-
-        if (
-            getattr(
-                furniture,
-                "OICType",
-                "",
-            )
-            != "OpenInteriorCAD::Furniture"
-        ):
-            QtWidgets.QMessageBox.warning(
-                Gui.getMainWindow(),
-                "Przesuń mebel",
-                "Zaznaczony obiekt nie jest meblem.",
-            )
-
-            return
-
-        tool = FurnitureMoveTool(
+        panel = FurnitureMovePanel(
             furniture
         )
 
-        ACTIVE_MOVE_TOOL = tool
+        Gui.Control.showDialog(
+            panel
+        )
+
+
+class SnapFurnitureToWallCommand:
+    """Snap furniture back edge to selected wall."""
+
+    def GetResources(self):
+        return {
+            "MenuText": "Snap to Wall",
+            "ToolTip": (
+                "Dosuwa tylną krawędź mebla "
+                "do wskazanej ściany."
+            ),
+        }
+
+    def IsActive(self):
+        return True
+
+    def Activated(self):
+        global ACTIVE_SNAP_TOOL
+
+        stop_active_tools()
+
+        furniture = get_selected_furniture(
+            "Dosuń do ściany"
+        )
+
+        if furniture is None:
+            return
+
+        tool = FurnitureSnapWallTool(
+            furniture
+        )
+
+        ACTIVE_SNAP_TOOL = tool
 
         tool.start()
 
+
+class SnapFurnitureToFurnitureCommand:
+    """Snap furniture side-to-side."""
+
+    def GetResources(self):
+        return {
+            "MenuText": "Snap to Cabinet",
+            "ToolTip": (
+                "Dosuwa zaznaczony mebel bokiem "
+                "do wskazanej szafki."
+            ),
+        }
+
+    def IsActive(self):
+        return True
+
+    def Activated(self):
+        global ACTIVE_SNAP_TOOL
+
+        stop_active_tools()
+
+        furniture = get_selected_furniture(
+            "Dosuń do szafki"
+        )
+
+        if furniture is None:
+            return
+
+        tool = FurnitureSnapFurnitureTool(
+            furniture
+        )
+
+        ACTIVE_SNAP_TOOL = tool
+
+        tool.start()
+class DuplicateFurnitureCommand:
+    """Duplicate selected furniture."""
+
+    def GetResources(self):
+        return {
+            "MenuText": "Duplicate Cabinet",
+            "ToolTip": (
+                "Tworzy identyczną szafkę "
+                "po lewej lub prawej stronie."
+            ),
+        }
+
+    def IsActive(self):
+        return True
+
+    def Activated(self):
+        stop_active_tools()
+
+        if Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+
+        furniture = get_selected_furniture(
+            "Duplikuj szafkę"
+        )
+
+        if furniture is None:
+            return
+
+        panel = FurnitureDuplicatePanel(
+            furniture
+        )
+
+        Gui.Control.showDialog(
+            panel
+        )
 
 Gui.addCommand(
     "OIC_AddFurniture",
@@ -401,4 +503,19 @@ Gui.addCommand(
 Gui.addCommand(
     "OIC_MoveFurniture",
     MoveFurnitureCommand(),
+)
+
+Gui.addCommand(
+    "OIC_SnapFurnitureWall",
+    SnapFurnitureToWallCommand(),
+)
+
+Gui.addCommand(
+    "OIC_SnapFurnitureFurniture",
+    SnapFurnitureToFurnitureCommand(),
+)
+
+Gui.addCommand(
+    "OIC_DuplicateFurniture",
+    DuplicateFurnitureCommand(),
 )
