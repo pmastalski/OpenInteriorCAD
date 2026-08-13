@@ -15,14 +15,25 @@ REFERENCE_RIGHT = "Prawa krawędź"
 
 
 def normalize_angle(angle):
+    """Normalize angle to -180..180."""
+
     return (
         angle + 180.0
     ) % 360.0 - 180.0
 
 
 def wall_unit_vectors(wall):
-    dx = wall.EndPoint.x - wall.StartPoint.x
-    dy = wall.EndPoint.y - wall.StartPoint.y
+    """Return wall tangent and left normal."""
+
+    dx = (
+        wall.EndPoint.x
+        - wall.StartPoint.x
+    )
+
+    dy = (
+        wall.EndPoint.y
+        - wall.StartPoint.y
+    )
 
     length = math.hypot(
         dx,
@@ -31,8 +42,16 @@ def wall_unit_vectors(wall):
 
     if length <= 0.001:
         return (
-            App.Vector(1.0, 0.0, 0.0),
-            App.Vector(0.0, 1.0, 0.0),
+            App.Vector(
+                1.0,
+                0.0,
+                0.0,
+            ),
+            App.Vector(
+                0.0,
+                1.0,
+                0.0,
+            ),
         )
 
     tangent = App.Vector(
@@ -54,7 +73,12 @@ def wall_unit_vectors(wall):
 
 
 def wall_face_offsets(wall):
-    thickness = wall.Thickness.Value
+    """Return offsets of both physical wall faces."""
+
+    thickness = (
+        wall.Thickness.Value
+    )
+
     reference = str(
         wall.ReferenceLine
     )
@@ -88,6 +112,8 @@ def point_to_segment(
     start,
     end,
 ):
+    """Return closest point, distance and segment parameter."""
+
     vx = end.x - start.x
     vy = end.y - start.y
 
@@ -100,12 +126,20 @@ def point_to_segment(
     )
 
     if length_squared <= 0.001:
+        closest = App.Vector(
+            start.x,
+            start.y,
+            0.0,
+        )
+
+        distance = math.hypot(
+            point.x - start.x,
+            point.y - start.y,
+        )
+
         return (
-            App.Vector(
-                start.x,
-                start.y,
-                0.0,
-            ),
+            closest,
+            distance,
             0.0,
         )
 
@@ -128,9 +162,47 @@ def point_to_segment(
         0.0,
     )
 
+    distance = math.hypot(
+        point.x - closest.x,
+        point.y - closest.y,
+    )
+
     return (
         closest,
+        distance,
         t,
+    )
+
+
+def make_wall_face_segment(
+    wall,
+    offset,
+):
+    """Return start/end of one real wall face."""
+
+    _, normal = wall_unit_vectors(
+        wall
+    )
+
+    start = App.Vector(
+        wall.StartPoint.x
+        + normal.x * offset,
+        wall.StartPoint.y
+        + normal.y * offset,
+        0.0,
+    )
+
+    end = App.Vector(
+        wall.EndPoint.x
+        + normal.x * offset,
+        wall.EndPoint.y
+        + normal.y * offset,
+        0.0,
+    )
+
+    return (
+        start,
+        end,
     )
 
 
@@ -139,13 +211,9 @@ def get_selected_face(
     click_point,
 ):
     """
-    Check both real wall faces and return
-    the face closest to the clicked point.
+    Return the physical wall face nearest
+    to the clicked point.
     """
-
-    _, normal = wall_unit_vectors(
-        wall
-    )
 
     positive_offset, negative_offset = (
         wall_face_offsets(
@@ -155,35 +223,25 @@ def get_selected_face(
 
     candidates = []
 
-    for side, offset in [
+    for side, offset in (
         (1.0, positive_offset),
         (-1.0, negative_offset),
-    ]:
-        start = App.Vector(
-            wall.StartPoint.x
-            + normal.x * offset,
-            wall.StartPoint.y
-            + normal.y * offset,
-            0.0,
+    ):
+        start, end = (
+            make_wall_face_segment(
+                wall,
+                offset,
+            )
         )
 
-        end = App.Vector(
-            wall.EndPoint.x
-            + normal.x * offset,
-            wall.EndPoint.y
-            + normal.y * offset,
-            0.0,
-        )
-
-        closest, t = point_to_segment(
+        (
+            closest,
+            distance,
+            t,
+        ) = point_to_segment(
             click_point,
             start,
             end,
-        )
-
-        distance = math.hypot(
-            click_point.x - closest.x,
-            click_point.y - closest.y,
         )
 
         candidates.append(
@@ -197,7 +255,7 @@ def get_selected_face(
         )
 
     candidates.sort(
-        key=lambda item: item[0]
+        key=lambda value: value[0]
     )
 
     return candidates[0]
@@ -208,16 +266,21 @@ def rotation_for_wall(
     side,
 ):
     """
-    Furniture local +Y is the front direction.
-    It must point away from the selected wall face.
+    Return furniture rotation so local +Y
+    points away from selected wall face.
     """
 
     _, normal = wall_unit_vectors(
         wall
     )
 
-    front_x = normal.x * side
-    front_y = normal.y * side
+    front_x = (
+        normal.x * side
+    )
+
+    front_y = (
+        normal.y * side
+    )
 
     rotation = math.degrees(
         math.atan2(
@@ -236,8 +299,17 @@ def snap_to_wall(
     wall,
     click_point,
 ):
-    tangent, normal = wall_unit_vectors(
-        wall
+    """
+    Place furniture with its back edge
+    directly against selected wall face.
+
+    Click position determines location along wall.
+    """
+
+    tangent, normal = (
+        wall_unit_vectors(
+            wall
+        )
     )
 
     (
@@ -251,8 +323,13 @@ def snap_to_wall(
         click_point,
     )
 
-    width = furniture.Width.Value
-    half_width = width / 2.0
+    width = (
+        furniture.Width.Value
+    )
+
+    half_width = (
+        width / 2.0
+    )
 
     dx = (
         face_point.x
@@ -269,7 +346,9 @@ def snap_to_wall(
         + dy * tangent.y
     )
 
-    wall_length = wall.Length.Value
+    wall_length = (
+        wall.Length.Value
+    )
 
     if width <= wall_length:
         along = max(
@@ -296,13 +375,13 @@ def snap_to_wall(
         side,
     )
 
-    angle_rad = math.radians(
+    angle = math.radians(
         rotation
     )
 
     local_x = App.Vector(
-        math.cos(angle_rad),
-        math.sin(angle_rad),
+        math.cos(angle),
+        math.sin(angle),
         0.0,
     )
 
@@ -314,21 +393,33 @@ def snap_to_wall(
         furniture.Position.z,
     )
 
-    furniture.RotationAngle = rotation
-    furniture.Position = position
+    furniture.RotationAngle = (
+        rotation
+    )
+
+    furniture.Position = (
+        position
+    )
 
     furniture.Document.recompute()
 
 
 class FurnitureSnapWallTool:
-    """Click a wall and snap selected furniture to it."""
+    """Click a wall to snap furniture to it."""
 
     def __init__(
         self,
         furniture,
+        on_finished=None,
     ):
         self.furniture = furniture
-        self.document = furniture.Document
+        self.document = (
+            furniture.Document
+        )
+
+        self.on_finished = (
+            on_finished
+        )
 
         self.view = None
         self.callback = None
@@ -337,24 +428,37 @@ class FurnitureSnapWallTool:
         self.active = False
 
     def start(self):
-        gui_document = Gui.activeDocument()
+        gui_document = (
+            Gui.activeDocument()
+        )
 
         if gui_document is None:
             return
 
-        self.view = gui_document.activeView()
-        self.active = True
-
-        self.callback = self.view.addEventCallback(
-            "SoMouseButtonEvent",
-            self._mouse_event,
+        self.view = (
+            gui_document.activeView()
         )
 
-        main_window = Gui.getMainWindow()
+        self.active = True
 
-        self.escape_shortcut = QtGui.QShortcut(
-            QtGui.QKeySequence("Esc"),
-            main_window,
+        self.callback = (
+            self.view.addEventCallback(
+                "SoMouseButtonEvent",
+                self._mouse_event,
+            )
+        )
+
+        main_window = (
+            Gui.getMainWindow()
+        )
+
+        self.escape_shortcut = (
+            QtGui.QShortcut(
+                QtGui.QKeySequence(
+                    "Esc"
+                ),
+                main_window,
+            )
         )
 
         self.escape_shortcut.setContext(
@@ -367,10 +471,11 @@ class FurnitureSnapWallTool:
 
         try:
             main_window.statusBar().showMessage(
-                "OpenInteriorCAD: kliknij ścianę, "
-                "do której dosunąć mebel tyłem. "
-                "Esc = anuluj."
+                "OpenInteriorCAD: click a wall. "
+                "The cabinet will snap with its back "
+                "edge against the wall. Esc = cancel."
             )
+
         except Exception:
             pass
 
@@ -387,15 +492,28 @@ class FurnitureSnapWallTool:
         if info.get("Button") != "BUTTON1":
             return
 
-        selection_info = self.view.getObjectInfo(
-            info["Position"]
+        screen_position = (
+            info.get(
+                "Position"
+            )
         )
 
-        if not selection_info:
+        if screen_position is None:
             return
 
-        object_name = selection_info.get(
-            "Object"
+        object_info = (
+            self.view.getObjectInfo(
+                screen_position
+            )
+        )
+
+        if not object_info:
+            return
+
+        object_name = (
+            object_info.get(
+                "Object"
+            )
         )
 
         if not object_name:
@@ -418,15 +536,12 @@ class FurnitureSnapWallTool:
         ):
             return
 
-        position = info.get(
-            "Position"
-        )
-
         try:
             point = self.view.getPoint(
-                position[0],
-                position[1],
+                screen_position[0],
+                screen_position[1],
             )
+
         except Exception:
             return
 
@@ -437,14 +552,14 @@ class FurnitureSnapWallTool:
         )
 
         self.document.openTransaction(
-            "Dosuń mebel do ściany"
+            "Snap Furniture to Wall"
         )
 
         try:
             snap_to_wall(
-                self.furniture,
-                wall,
-                click_point,
+                furniture=self.furniture,
+                wall=wall,
+                click_point=click_point,
             )
 
             self.document.commitTransaction()
@@ -459,12 +574,14 @@ class FurnitureSnapWallTool:
 
             return
 
-        Gui.Selection.clearSelection()
-        Gui.Selection.addSelection(
-            self.furniture
-        )
-
         self.stop()
+
+        if self.on_finished is not None:
+            try:
+                self.on_finished()
+
+            except Exception:
+                pass
 
     def stop(self):
         if (
@@ -476,6 +593,7 @@ class FurnitureSnapWallTool:
                     "SoMouseButtonEvent",
                     self.callback,
                 )
+
             except Exception:
                 pass
 
@@ -483,8 +601,12 @@ class FurnitureSnapWallTool:
 
         if self.escape_shortcut is not None:
             try:
-                self.escape_shortcut.setEnabled(False)
+                self.escape_shortcut.setEnabled(
+                    False
+                )
+
                 self.escape_shortcut.deleteLater()
+
             except Exception:
                 pass
 
@@ -493,5 +615,6 @@ class FurnitureSnapWallTool:
 
         try:
             Gui.getMainWindow().statusBar().clearMessage()
+
         except Exception:
             pass

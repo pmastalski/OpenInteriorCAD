@@ -9,7 +9,11 @@ from PySide import QtWidgets
 
 from OICFurniture import create_furniture
 from OICFurnitureEditPanel import FurnitureEditPanel
-from OICFurnitureMove import FurnitureMoveTool
+
+from OICFurnitureMovePanel import (
+    FurnitureMovePanel,
+)
+
 from OICFurniturePanel import FurniturePanel
 from OICFurnitureSnapFurniture import (
     FurnitureSnapFurnitureTool,
@@ -287,7 +291,7 @@ class AddFurnitureCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Wstaw szafkę",
+            "MenuText": "Add Cabinet",
             "ToolTip": (
                 "Wstawia parametryczną szafkę."
             ),
@@ -312,7 +316,7 @@ class EditFurnitureCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Edytuj mebel",
+            "MenuText": "Edit Furniture",
             "ToolTip": (
                 "Edytuje wymiary, położenie "
                 "i obrót zaznaczonego mebla."
@@ -343,15 +347,15 @@ class EditFurnitureCommand:
             panel
         )
 
-
 class MoveFurnitureCommand:
-    """Move selected furniture freely."""
+    """Open precise furniture movement panel."""
 
     def GetResources(self):
         return {
-            "MenuText": "Przesuń mebel",
+            "MenuText": "Move Furniture",
             "ToolTip": (
-                "Swobodnie przesuwa zaznaczony mebel."
+                "Precisely move, nudge and position "
+                "the selected furniture."
             ),
         }
 
@@ -359,24 +363,25 @@ class MoveFurnitureCommand:
         return True
 
     def Activated(self):
-        global ACTIVE_MOVE_TOOL
-
         stop_active_tools()
 
+        if Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+
         furniture = get_selected_furniture(
-            "Przesuń mebel"
+            "Move Furniture"
         )
 
         if furniture is None:
             return
 
-        tool = FurnitureMoveTool(
+        panel = FurnitureMovePanel(
             furniture
         )
 
-        ACTIVE_MOVE_TOOL = tool
-
-        tool.start()
+        Gui.Control.showDialog(
+            panel
+        )
 
 
 class SnapFurnitureToWallCommand:
@@ -384,7 +389,7 @@ class SnapFurnitureToWallCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Dosuń do ściany",
+            "MenuText": "Snap to Wall",
             "ToolTip": (
                 "Dosuwa tylną krawędź mebla "
                 "do wskazanej ściany."
@@ -420,7 +425,7 @@ class SnapFurnitureToFurnitureCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Dosuń do szafki",
+            "MenuText": "Snap to Cabinet",
             "ToolTip": (
                 "Dosuwa zaznaczony mebel bokiem "
                 "do wskazanej szafki."
@@ -454,7 +459,7 @@ class DuplicateFurnitureCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Duplikuj szafkę",
+            "MenuText": "Duplicate Cabinet",
             "ToolTip": (
                 "Tworzy identyczną szafkę "
                 "po lewej lub prawej stronie."
