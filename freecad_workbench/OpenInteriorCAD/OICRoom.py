@@ -21,7 +21,7 @@ def create_room(
         name,
     )
 
-    room.Label = "Pomieszczenie"
+    room.Label = "Room"
 
     # --------------------------------------------------
     # OPENINTERIORCAD TYPE

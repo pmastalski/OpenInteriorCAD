@@ -18,7 +18,7 @@ class WindowPanel:
 
         self.form = QtWidgets.QWidget()
         self.form.setWindowTitle(
-            "Dodaj okno"
+            "Add Window"
         )
 
         self._build_ui()
@@ -31,7 +31,7 @@ class WindowPanel:
 
         title = QtWidgets.QLabel(
             "<b>OpenInteriorCAD</b><br>"
-            "Dodaj okno"
+            "Add Window"
         )
 
         layout.addWidget(title)
@@ -44,7 +44,7 @@ class WindowPanel:
         )
 
         group = QtWidgets.QGroupBox(
-            "Parametry okna"
+            "Window Parameters"
         )
 
         form = QtWidgets.QFormLayout(
@@ -61,7 +61,7 @@ class WindowPanel:
         self.width_input.setSuffix(" mm")
 
         form.addRow(
-            "Szerokość:",
+            "Width:",
             self.width_input,
         )
 
@@ -75,7 +75,7 @@ class WindowPanel:
         self.height_input.setSuffix(" mm")
 
         form.addRow(
-            "Wysokość:",
+            "Height:",
             self.height_input,
         )
 
@@ -89,7 +89,7 @@ class WindowPanel:
         self.sill_input.setSuffix(" mm")
 
         form.addRow(
-            "Wysokość parapetu:",
+            "Sill Height:",
             self.sill_input,
         )
 
@@ -103,15 +103,15 @@ class WindowPanel:
         self.offset_input.setSuffix(" mm")
 
         form.addRow(
-            "Od początku ściany:",
+            "From Wall Start:",
             self.offset_input,
         )
 
         layout.addWidget(group)
 
         self.info_label = QtWidgets.QLabel(
-            "Pozycja okna jest liczona od początku "
-            "wybranej ściany."
+            "Window position is measured from the start "
+            "of the selected wall."
         )
         self.info_label.setWordWrap(True)
 
@@ -120,11 +120,11 @@ class WindowPanel:
         )
 
         self.add_button = QtWidgets.QPushButton(
-            "Dodaj okno"
+            "Add Window"
         )
 
         self.close_button = QtWidgets.QPushButton(
-            "Zamknij"
+            "Close"
         )
 
         layout.addWidget(
@@ -159,9 +159,9 @@ class WindowPanel:
 
     def _load_wall(self):
         self.wall_label.setText(
-            f"<b>Ściana:</b> {self.wall.Label}<br>"
-            f"Długość: {self.wall.Length.Value:.0f} mm<br>"
-            f"Wysokość: {self.wall.Height.Value:.0f} mm"
+            f"<b>Wall:</b> {self.wall.Label}<br>"
+            f"Length: {self.wall.Length.Value:.0f} mm<br>"
+            f"Height: {self.wall.Height.Value:.0f} mm"
         )
 
         self._update_limits()
@@ -212,7 +212,7 @@ class WindowPanel:
             return
 
         document.openTransaction(
-            "Dodaj okno"
+            "Add Window"
         )
 
         try:
@@ -239,7 +239,7 @@ class WindowPanel:
             document.abortTransaction()
 
             App.Console.PrintError(
-                "OpenInteriorCAD: błąd dodawania okna: "
+                "OpenInteriorCAD window add error: "
                 f"{error}\n"
             )
 
@@ -251,7 +251,7 @@ class WindowPanel:
         )
 
         self.info_label.setText(
-            "Okno dodane: "
+            "Window added: "
             f"{window.Width.Value:.0f} × "
             f"{window.Height.Value:.0f} mm, "
             f"parapet {window.SillHeight.Value:.0f} mm."

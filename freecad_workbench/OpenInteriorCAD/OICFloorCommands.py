@@ -1,6 +1,7 @@
 """Floor commands for OpenInteriorCAD."""
 
 import FreeCADGui as Gui
+from OICIcons import icon
 from PySide import QtWidgets
 
 from OICFloor import (
@@ -47,11 +48,9 @@ class AddFloorCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Utwórz podłogę",
-            "ToolTip": (
-                "Tworzy parametryczną podłogę "
-                "dla zaznaczonego pomieszczenia."
-            ),
+            "Pixmap": icon("add_floor.svg"),
+            "MenuText": "Add Floor",
+            "ToolTip": "Create a parametric floor for the selected room.",
         }
 
     def IsActive(self):

@@ -11,8 +11,8 @@ class OpenInteriorCADWorkbench(Gui.Workbench):
     MenuText = "OpenInteriorCAD"
 
     ToolTip = (
-        "Projektowanie wnętrz i mebli "
-        "z wykorzystaniem inteligentnych obiektów."
+        "Interior and furniture design with "
+        "parametric OpenInteriorCAD objects."
     )
 
     Icon = ""
@@ -20,35 +20,12 @@ class OpenInteriorCADWorkbench(Gui.Workbench):
     def Initialize(self):
         """Register OpenInteriorCAD commands."""
 
-        # --------------------------------------------------
-        # ARCHITEKTURA
-        # --------------------------------------------------
-
         import OICCommands
-
-        # --------------------------------------------------
-        # OKNA
-        # --------------------------------------------------
-
         import OICWindowCommands
-
-        # --------------------------------------------------
-        # PODŁOGA
-        # --------------------------------------------------
-
         import OICFloorCommands
-
-        # --------------------------------------------------
-        # MEBLE
-        # --------------------------------------------------
-
         import OICFurnitureCommands
+        import OICCabinetRunCommands
 
-        # Podczas rozwoju Workbencha FreeCAD potrafi
-        # pozostawić starszą wersję modułu w sys.modules.
-        #
-        # Jeżeli nowe komendy nie zostały zarejestrowane,
-        # przeładuj moduł meblowy.
         commands = Gui.listCommands()
 
         if (
@@ -62,35 +39,42 @@ class OpenInteriorCADWorkbench(Gui.Workbench):
                 OICFurnitureCommands
             )
 
-        # --------------------------------------------------
-        # TOOLBAR / MENU
-        # --------------------------------------------------
+        if (
+            "OIC_CreateCabinetRun"
+            not in Gui.listCommands()
+        ):
+            importlib.reload(
+                OICCabinetRunCommands
+            )
 
         self.command_list = [
-            # Pomieszczenie
+            # Room
             "OIC_DrawRoomV2",
             "OIC_EditWallV2",
 
-            # Drzwi
+            # Doors
             "OIC_AddDoor",
             "OIC_EditDoor",
 
-            # Okna
+            # Windows
             "OIC_AddWindow",
             "OIC_EditWindow",
 
-            # Podłoga
+            # Floor
             "OIC_AddFloor",
 
-            # Meble
+            # Furniture
             "OIC_AddFurniture",
             "OIC_EditFurniture",
             "OIC_MoveFurniture",
-
-            # Osobne operacje dosuwania
             "OIC_SnapFurnitureWall",
             "OIC_SnapFurnitureFurniture",
             "OIC_DuplicateFurniture",
+
+            # Cabinet Run
+            "OIC_CreateCabinetRun",
+            "OIC_MoveCabinetRun",
+            "OIC_UngroupCabinetRun",
         ]
 
         self.appendToolbar(
@@ -104,21 +88,15 @@ class OpenInteriorCADWorkbench(Gui.Workbench):
         )
 
     def Activated(self):
-        """Called when workbench becomes active."""
-
         pass
 
     def Deactivated(self):
-        """Called when leaving workbench."""
-
         pass
 
     def ContextMenu(
         self,
         recipient,
     ):
-        """Add OpenInteriorCAD context menu."""
-
         self.appendContextMenu(
             "OpenInteriorCAD",
             self.command_list,

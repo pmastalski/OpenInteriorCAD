@@ -2,6 +2,7 @@
 
 import FreeCAD as App
 import FreeCADGui as Gui
+from OICIcons import icon
 from OICFurnitureDuplicatePanel import (
     FurnitureDuplicatePanel,
 )
@@ -291,10 +292,9 @@ class AddFurnitureCommand:
 
     def GetResources(self):
         return {
+            "Pixmap": icon("add_cabinet.svg"),
             "MenuText": "Add Cabinet",
-            "ToolTip": (
-                "Wstawia parametryczną szafkę."
-            ),
+            "ToolTip": "Add a parametric cabinet.",
         }
 
     def IsActive(self):
@@ -316,11 +316,9 @@ class EditFurnitureCommand:
 
     def GetResources(self):
         return {
+            "Pixmap": icon("edit_furniture.svg"),
             "MenuText": "Edit Furniture",
-            "ToolTip": (
-                "Edytuje wymiary, położenie "
-                "i obrót zaznaczonego mebla."
-            ),
+            "ToolTip": "Edit dimensions, position and rotation.",
         }
 
     def IsActive(self):
@@ -352,11 +350,9 @@ class MoveFurnitureCommand:
 
     def GetResources(self):
         return {
+            "Pixmap": icon("move_furniture.svg"),
             "MenuText": "Move Furniture",
-            "ToolTip": (
-                "Precisely move, nudge and position "
-                "the selected furniture."
-            ),
+            "ToolTip": "Precisely move, nudge, rotate and position furniture.",
         }
 
     def IsActive(self):
@@ -389,11 +385,9 @@ class SnapFurnitureToWallCommand:
 
     def GetResources(self):
         return {
+            "Pixmap": icon("snap_wall.svg"),
             "MenuText": "Snap to Wall",
-            "ToolTip": (
-                "Dosuwa tylną krawędź mebla "
-                "do wskazanej ściany."
-            ),
+            "ToolTip": "Snap the cabinet back edge to a selected wall.",
         }
 
     def IsActive(self):
@@ -425,11 +419,9 @@ class SnapFurnitureToFurnitureCommand:
 
     def GetResources(self):
         return {
+            "Pixmap": icon("snap_cabinet.svg"),
             "MenuText": "Snap to Cabinet",
-            "ToolTip": (
-                "Dosuwa zaznaczony mebel bokiem "
-                "do wskazanej szafki."
-            ),
+            "ToolTip": "Snap the selected cabinet side-to-side with another cabinet.",
         }
 
     def IsActive(self):
@@ -459,11 +451,9 @@ class DuplicateFurnitureCommand:
 
     def GetResources(self):
         return {
+            "Pixmap": icon("duplicate_cabinet.svg"),
             "MenuText": "Duplicate Cabinet",
-            "ToolTip": (
-                "Tworzy identyczną szafkę "
-                "po lewej lub prawej stronie."
-            ),
+            "ToolTip": "Duplicate the cabinet to the left or right.",
         }
 
     def IsActive(self):

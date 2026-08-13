@@ -16,7 +16,7 @@ class FurniturePanel:
         self.form = QtWidgets.QWidget()
 
         self.form.setWindowTitle(
-            "Wstaw szafkę"
+            "Add Cabinet"
         )
 
         self._build_ui()
@@ -28,7 +28,7 @@ class FurniturePanel:
 
         title = QtWidgets.QLabel(
             "<b>OpenInteriorCAD</b><br>"
-            "Wstaw szafkę"
+            "Add Cabinet"
         )
 
         layout.addWidget(
@@ -36,7 +36,7 @@ class FurniturePanel:
         )
 
         self.status_label = QtWidgets.QLabel(
-            "Podaj wymiary mebla."
+            "Enter cabinet dimensions."
         )
 
         self.status_label.setWordWrap(
@@ -48,7 +48,7 @@ class FurniturePanel:
         )
 
         dimensions_group = QtWidgets.QGroupBox(
-            "Wymiary"
+            "Dimensions"
         )
 
         dimensions_layout = QtWidgets.QFormLayout(
@@ -75,7 +75,7 @@ class FurniturePanel:
         )
 
         dimensions_layout.addRow(
-            "Szerokość:",
+            "Width:",
             self.width_input,
         )
 
@@ -99,7 +99,7 @@ class FurniturePanel:
         )
 
         dimensions_layout.addRow(
-            "Głębokość:",
+            "Depth:",
             self.depth_input,
         )
 
@@ -123,7 +123,7 @@ class FurniturePanel:
         )
 
         dimensions_layout.addRow(
-            "Wysokość:",
+            "Height:",
             self.height_input,
         )
 
@@ -147,7 +147,7 @@ class FurniturePanel:
         )
 
         dimensions_layout.addRow(
-            "Obrót:",
+            "Rotation:",
             self.rotation_input,
         )
 
@@ -194,7 +194,7 @@ class FurniturePanel:
         )
 
         self.place_button = QtWidgets.QPushButton(
-            "Wskaż położenie"
+            "Pick Position"
         )
 
         layout.addWidget(
@@ -202,7 +202,7 @@ class FurniturePanel:
         )
 
         self.close_button = QtWidgets.QPushButton(
-            "Zamknij"
+            "Close"
         )
 
         layout.addWidget(
@@ -252,8 +252,8 @@ class FurniturePanel:
         )
 
         self.status_label.setText(
-            "Kliknij w widoku miejsce, "
-            "w którym ma zostać wstawiona szafka."
+            "Click in the view where "
+            "the cabinet should be placed."
         )
 
     def placement_finished(
@@ -261,15 +261,15 @@ class FurniturePanel:
         furniture,
     ):
         self.status_label.setText(
-            "Szafka została wstawiona. "
-            "Możesz wskazać kolejne położenie."
+            "Cabinet added. "
+            "You can pick another position."
         )
 
     def placement_cancelled(
         self,
     ):
         self.status_label.setText(
-            "Wstawianie anulowane."
+            "Placement cancelled."
         )
 
     def _close(self):

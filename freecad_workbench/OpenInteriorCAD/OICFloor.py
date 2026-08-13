@@ -466,7 +466,7 @@ def create_floor(
         name,
     )
 
-    obj.Label = "Podłoga"
+    obj.Label = "Floor"
 
     FloorProxy(
         obj,

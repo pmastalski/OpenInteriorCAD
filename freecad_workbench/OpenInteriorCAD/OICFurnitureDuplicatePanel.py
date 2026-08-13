@@ -20,7 +20,7 @@ class FurnitureDuplicatePanel:
         self.form = QtWidgets.QWidget()
 
         self.form.setWindowTitle(
-            "Duplikuj szafkę"
+            "Duplicate Cabinet"
         )
 
         self._build_ui()
@@ -32,7 +32,7 @@ class FurnitureDuplicatePanel:
 
         title = QtWidgets.QLabel(
             "<b>OpenInteriorCAD</b><br>"
-            "Duplikuj szafkę"
+            "Duplicate Cabinet"
         )
 
         layout.addWidget(
@@ -40,10 +40,10 @@ class FurnitureDuplicatePanel:
         )
 
         info = QtWidgets.QLabel(
-            f"Wybrany mebel: "
+            f"Selected furniture: "
             f"<b>{self.furniture.Label}</b><br><br>"
-            "Wybierz stronę, po której ma zostać "
-            "utworzona kopia."
+            "Choose the side where "
+            "the copy should be created."
         )
 
         info.setWordWrap(
@@ -57,11 +57,11 @@ class FurnitureDuplicatePanel:
         buttons = QtWidgets.QHBoxLayout()
 
         self.left_button = QtWidgets.QPushButton(
-            "← Lewo"
+            "← Left"
         )
 
         self.right_button = QtWidgets.QPushButton(
-            "Prawo →"
+            "Right →"
         )
 
         buttons.addWidget(
@@ -89,7 +89,7 @@ class FurnitureDuplicatePanel:
         )
 
         self.close_button = QtWidgets.QPushButton(
-            "Zamknij"
+            "Close"
         )
 
         layout.addWidget(
@@ -129,7 +129,7 @@ class FurnitureDuplicatePanel:
         )
 
         document.openTransaction(
-            "Duplikuj szafkę"
+            "Duplicate Cabinet"
         )
 
         try:
@@ -146,7 +146,7 @@ class FurnitureDuplicatePanel:
             document.abortTransaction()
 
             self.status_label.setText(
-                f"Błąd: {error}"
+                f"Error: {error}"
             )
 
             return
@@ -154,9 +154,9 @@ class FurnitureDuplicatePanel:
         if new_furniture is None:
             return
 
-        # Nowa szafka staje się kolejnym źródłem.
-        # Dzięki temu można szybko klikać Prawo →
-        # i budować cały ciąg.
+        # The new cabinet becomes the next source.
+        # This allows repeated Right → clicks
+        # to build a complete run.
         self.furniture = (
             new_furniture
         )
@@ -169,12 +169,12 @@ class FurnitureDuplicatePanel:
 
         if side == "left":
             self.status_label.setText(
-                "Utworzono szafkę po lewej stronie."
+                "Cabinet created on the left."
             )
 
         else:
             self.status_label.setText(
-                "Utworzono szafkę po prawej stronie."
+                "Cabinet created on the right."
             )
 
     def _close(self):

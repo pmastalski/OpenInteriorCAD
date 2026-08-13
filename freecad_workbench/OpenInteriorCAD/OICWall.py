@@ -1015,7 +1015,7 @@ def create_wall(
         name,
     )
 
-    obj.Label = "Ściana"
+    obj.Label = "Wall"
 
     WallProxy(
         obj,

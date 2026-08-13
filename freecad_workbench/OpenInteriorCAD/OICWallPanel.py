@@ -12,7 +12,7 @@ class WallDrawingPanel:
 
         self.form = QtWidgets.QWidget()
         self.form.setWindowTitle(
-            "Rysowanie pomieszczenia"
+            "Draw Room"
         )
 
         self._build_ui()
@@ -24,7 +24,7 @@ class WallDrawingPanel:
 
         title = QtWidgets.QLabel(
             "<b>OpenInteriorCAD</b><br>"
-            "Rysowanie pomieszczenia"
+            "Draw Room"
         )
 
         main_layout.addWidget(
@@ -32,7 +32,7 @@ class WallDrawingPanel:
         )
 
         self.status_label = QtWidgets.QLabel(
-            "Kliknij w widoku pierwszy narożnik."
+            "Click the first room corner in the view."
         )
 
         self.status_label.setWordWrap(
@@ -44,11 +44,11 @@ class WallDrawingPanel:
         )
 
         # --------------------------------------------------
-        # AKTUALNY STAN
+        # CURRENT STATE
         # --------------------------------------------------
 
         current_group = QtWidgets.QGroupBox(
-            "Aktualny stan"
+            "Current State"
         )
 
         current_layout = QtWidgets.QFormLayout(
@@ -60,7 +60,7 @@ class WallDrawingPanel:
         )
 
         current_layout.addRow(
-            "Liczba ścian:",
+            "Walls:",
             self.wall_count_label,
         )
 
@@ -69,7 +69,7 @@ class WallDrawingPanel:
         )
 
         current_layout.addRow(
-            "Kierunek:",
+            "Direction:",
             self.heading_label,
         )
 
@@ -78,11 +78,11 @@ class WallDrawingPanel:
         )
 
         # --------------------------------------------------
-        # PARAMETRY NOWEJ ŚCIANY
+        # NEW WALL PARAMETERS
         # --------------------------------------------------
 
         dimensions_group = QtWidgets.QGroupBox(
-            "Nowa ściana"
+            "New Wall"
         )
 
         dimensions_layout = QtWidgets.QFormLayout(
@@ -109,7 +109,7 @@ class WallDrawingPanel:
         )
 
         dimensions_layout.addRow(
-            "Długość:",
+            "Length:",
             self.length_input,
         )
 
@@ -133,12 +133,12 @@ class WallDrawingPanel:
         )
 
         dimensions_layout.addRow(
-            "Kąt:",
+            "Angle:",
             self.angle_input,
         )
 
         self.angle_description = QtWidgets.QLabel(
-            "Pierwsza ściana: kąt względem osi X."
+            "First wall: angle from the X axis."
         )
 
         self.angle_description.setWordWrap(
@@ -150,7 +150,7 @@ class WallDrawingPanel:
         )
 
         # --------------------------------------------------
-        # SZYBKIE KĄTY
+        # QUICK ANGLES
         # --------------------------------------------------
 
         angle_buttons_layout = QtWidgets.QHBoxLayout()
@@ -192,7 +192,7 @@ class WallDrawingPanel:
         )
 
         # --------------------------------------------------
-        # GRUBOŚĆ
+        # THICKNESS
         # --------------------------------------------------
 
         self.thickness_input = QtWidgets.QDoubleSpinBox()
@@ -215,12 +215,12 @@ class WallDrawingPanel:
         )
 
         dimensions_layout.addRow(
-            "Grubość:",
+            "Thickness:",
             self.thickness_input,
         )
 
         # --------------------------------------------------
-        # WYSOKOŚĆ
+        # HEIGHT
         # --------------------------------------------------
 
         self.height_input = QtWidgets.QDoubleSpinBox()
@@ -243,7 +243,7 @@ class WallDrawingPanel:
         )
 
         dimensions_layout.addRow(
-            "Wysokość:",
+            "Height:",
             self.height_input,
         )
 
@@ -252,11 +252,11 @@ class WallDrawingPanel:
         )
 
         # --------------------------------------------------
-        # DODAJ ŚCIANĘ
+        # ADD WALL
         # --------------------------------------------------
 
         self.add_wall_button = QtWidgets.QPushButton(
-            "Dodaj ścianę"
+            "Add Wall"
         )
 
         self.add_wall_button.setEnabled(
@@ -268,11 +268,11 @@ class WallDrawingPanel:
         )
 
         # --------------------------------------------------
-        # COFNIJ
+        # UNDO
         # --------------------------------------------------
 
         self.undo_wall_button = QtWidgets.QPushButton(
-            "Cofnij ostatnią ścianę"
+            "Undo Last Wall"
         )
 
         self.undo_wall_button.setEnabled(
@@ -284,11 +284,11 @@ class WallDrawingPanel:
         )
 
         # --------------------------------------------------
-        # ZAMKNIJ POMIESZCZENIE
+        # CLOSE ROOM
         # --------------------------------------------------
 
         self.close_room_button = QtWidgets.QPushButton(
-            "Zamknij pomieszczenie"
+            "Close Room"
         )
 
         self.close_room_button.setEnabled(
@@ -300,11 +300,11 @@ class WallDrawingPanel:
         )
 
         # --------------------------------------------------
-        # NOWY PUNKT STARTOWY
+        # NEW START POINT
         # --------------------------------------------------
 
         self.new_start_button = QtWidgets.QPushButton(
-            "Wskaż nowy punkt startowy"
+            "Pick New Start Point"
         )
 
         main_layout.addWidget(
@@ -314,15 +314,15 @@ class WallDrawingPanel:
         main_layout.addStretch()
 
         # --------------------------------------------------
-        # ZAMKNIJ PANEL
+        # CLOSE PANEL
         # --------------------------------------------------
 
         self.close_button = QtWidgets.QPushButton(
-            "Zamknij"
+            "Close"
         )
 
         self.close_button.setToolTip(
-            "Kończy rysowanie i zamyka panel."
+            "Finish drawing and close the panel."
         )
 
         main_layout.addWidget(
@@ -330,7 +330,7 @@ class WallDrawingPanel:
         )
 
         # --------------------------------------------------
-        # SYGNAŁY
+        # SIGNALS
         # --------------------------------------------------
 
         self.right_button.clicked.connect(
@@ -378,7 +378,7 @@ class WallDrawingPanel:
         )
 
     # ------------------------------------------------------
-    # OBSŁUGA PRZYCISKÓW
+    # BUTTON HANDLERS
     # ------------------------------------------------------
 
     def _add_wall(self):
@@ -412,13 +412,13 @@ class WallDrawingPanel:
         )
 
     # ------------------------------------------------------
-    # STANY PANELU
+    # PANEL STATES
     # ------------------------------------------------------
 
     def set_start_point_ready(self):
         self.status_label.setText(
-            "Punkt startowy ustawiony. "
-            "Podaj parametry pierwszej ściany."
+            "Start point set. "
+            "Enter the first wall parameters."
         )
 
         self.wall_count_label.setText(
@@ -446,7 +446,7 @@ class WallDrawingPanel:
         )
 
         self.angle_description.setText(
-            "Pierwsza ściana: kąt względem osi X."
+            "First wall: angle from the X axis."
         )
 
     def set_wall_added(
@@ -455,7 +455,7 @@ class WallDrawingPanel:
         heading,
     ):
         self.status_label.setText(
-            f"Ściana {wall_count} utworzona."
+            f"Wall {wall_count} created."
         )
 
         self.wall_count_label.setText(
@@ -467,7 +467,7 @@ class WallDrawingPanel:
         )
 
         self.angle_description.setText(
-            "Kąt względem poprzedniej ściany. "
+            "Angle from the previous wall. "
             "+90° = w lewo, -90° = w prawo."
         )
 
@@ -523,14 +523,14 @@ class WallDrawingPanel:
         )
 
         self.status_label.setText(
-            "Ostatnia ściana została cofnięta."
+            "The last wall was removed."
         )
 
     def set_room_closed(self):
         self.status_label.setText(
-            "Pomieszczenie zamknięte. "
-            "Kliknij pierwszy narożnik "
-            "następnego pomieszczenia."
+            "Room closed. "
+            "Click the first corner "
+            "of the next room."
         )
 
         self.wall_count_label.setText(
@@ -559,7 +559,7 @@ class WallDrawingPanel:
 
     def set_waiting_for_start(self):
         self.status_label.setText(
-            "Kliknij w widoku pierwszy narożnik."
+            "Click the first room corner in the view."
         )
 
         self.wall_count_label.setText(

@@ -20,7 +20,7 @@ class WindowEditPanel:
         self.form = QtWidgets.QWidget()
 
         self.form.setWindowTitle(
-            "Edytuj okno"
+            "Edit Window"
         )
 
         self._build_ui()
@@ -33,7 +33,7 @@ class WindowEditPanel:
 
         title = QtWidgets.QLabel(
             "<b>OpenInteriorCAD</b><br>"
-            "Edytuj okno"
+            "Edit Window"
         )
 
         layout.addWidget(
@@ -51,7 +51,7 @@ class WindowEditPanel:
         )
 
         group = QtWidgets.QGroupBox(
-            "Wymiary i położenie"
+            "Dimensions and Position"
         )
 
         form = QtWidgets.QFormLayout(
@@ -74,7 +74,7 @@ class WindowEditPanel:
         )
 
         form.addRow(
-            "Szerokość:",
+            "Width:",
             self.width_input,
         )
 
@@ -94,7 +94,7 @@ class WindowEditPanel:
         )
 
         form.addRow(
-            "Wysokość:",
+            "Height:",
             self.height_input,
         )
 
@@ -114,7 +114,7 @@ class WindowEditPanel:
         )
 
         form.addRow(
-            "Wysokość parapetu:",
+            "Sill Height:",
             self.sill_input,
         )
 
@@ -134,7 +134,7 @@ class WindowEditPanel:
         )
 
         form.addRow(
-            "Od początku ściany:",
+            "From Wall Start:",
             self.offset_input,
         )
 
@@ -143,7 +143,7 @@ class WindowEditPanel:
         )
 
         self.close_button = QtWidgets.QPushButton(
-            "Zamknij"
+            "Close"
         )
 
         layout.addWidget(
@@ -180,10 +180,10 @@ class WindowEditPanel:
         try:
             self.info_label.setText(
                 f"<b>{self.window.Label}</b><br>"
-                f"Ściana: {self.wall.Label}<br>"
-                f"Długość ściany: "
+                f"Wall: {self.wall.Label}<br>"
+                f"Wall length: "
                 f"{self.wall.Length.Value:.0f} mm<br>"
-                f"Wysokość ściany: "
+                f"Wall height: "
                 f"{self.wall.Height.Value:.0f} mm"
             )
 
@@ -335,7 +335,7 @@ class WindowEditPanel:
 
         except Exception as error:
             App.Console.PrintError(
-                "OpenInteriorCAD: błąd edycji okna: "
+                "OpenInteriorCAD window edit error: "
                 f"{error}\n"
             )
 

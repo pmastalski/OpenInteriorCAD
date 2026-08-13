@@ -2,6 +2,7 @@
 
 import FreeCAD as App
 import FreeCADGui as Gui
+from OICIcons import icon
 from OICDoorEditPanel import DoorEditPanel
 from PySide import QtCore, QtGui, QtWidgets
 from OICDoorPanel import DoorPanel
@@ -524,10 +525,9 @@ class DrawRoomCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Rysuj pomieszczenie",
-            "ToolTip": (
-                "Rysuje pomieszczenie numerycznie."
-            ),
+            "Pixmap": icon("draw_room.svg"),
+            "MenuText": "Draw Room",
+            "ToolTip": "Draw a room using length and relative angle.",
         }
 
     def IsActive(self):
@@ -567,8 +567,9 @@ class EditWallCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Edytuj ścianę",
-            "ToolTip": "Edytuje zaznaczoną ścianę.",
+            "Pixmap": icon("edit_wall.svg"),
+            "MenuText": "Edit Wall",
+            "ToolTip": "Edit the selected wall.",
         }
 
     def IsActive(self):
@@ -632,11 +633,9 @@ class AddDoorCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Dodaj drzwi",
-            "ToolTip": (
-                "Dodaje drzwi do zaznaczonej "
-                "ściany OpenInteriorCAD."
-            ),
+            "Pixmap": icon("add_door.svg"),
+            "MenuText": "Add Door",
+            "ToolTip": "Add a door to the selected wall.",
         }
 
     def IsActive(self):
@@ -696,11 +695,9 @@ class EditDoorCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Edytuj drzwi",
-            "ToolTip": (
-                "Edytuje wymiary, położenie "
-                "i sposób otwierania drzwi."
-            ),
+            "Pixmap": icon("edit_door.svg"),
+            "MenuText": "Edit Door",
+            "ToolTip": "Edit door size, position and opening direction.",
         }
 
     def IsActive(self):
