@@ -27,7 +27,7 @@ class EditWallPanel:
         self.form = QtWidgets.QWidget()
 
         self.form.setWindowTitle(
-            "Edytuj ścianę"
+            "Edit Wall"
         )
 
         self._build_ui()
@@ -40,7 +40,7 @@ class EditWallPanel:
 
         title = QtWidgets.QLabel(
             "<b>OpenInteriorCAD</b><br>"
-            "Edycja ściany"
+            "Edit Wall"
         )
 
         main_layout.addWidget(
@@ -58,7 +58,7 @@ class EditWallPanel:
         )
 
         geometry_group = QtWidgets.QGroupBox(
-            "Geometria"
+            "Geometry"
         )
 
         geometry_layout = QtWidgets.QFormLayout(
@@ -81,7 +81,7 @@ class EditWallPanel:
         )
 
         geometry_layout.addRow(
-            "Długość:",
+            "Length:",
             self.length_input,
         )
 
@@ -101,7 +101,7 @@ class EditWallPanel:
         )
 
         geometry_layout.addRow(
-            "Kąt:",
+            "Angle:",
             self.angle_input,
         )
 
@@ -131,7 +131,7 @@ class EditWallPanel:
         )
 
         geometry_layout.addRow(
-            "Grubość:",
+            "Thickness:",
             self.thickness_input,
         )
 
@@ -151,22 +151,27 @@ class EditWallPanel:
         )
 
         geometry_layout.addRow(
-            "Wysokość:",
+            "Height:",
             self.height_input,
         )
 
         self.reference_combo = QtWidgets.QComboBox()
 
-        self.reference_combo.addItems(
-            [
-                REFERENCE_AXIS,
-                REFERENCE_LEFT,
-                REFERENCE_RIGHT,
-            ]
+        self.reference_combo.addItem(
+            "Axis",
+            REFERENCE_AXIS,
+        )
+        self.reference_combo.addItem(
+            "Left Edge",
+            REFERENCE_LEFT,
+        )
+        self.reference_combo.addItem(
+            "Right Edge",
+            REFERENCE_RIGHT,
         )
 
         geometry_layout.addRow(
-            "Linia odniesienia:",
+            "Reference Line:",
             self.reference_combo,
         )
 
@@ -175,7 +180,7 @@ class EditWallPanel:
         )
 
         calculated_group = QtWidgets.QGroupBox(
-            "Wartości obliczone"
+            "Calculated Values"
         )
 
         calculated_layout = QtWidgets.QFormLayout(
@@ -185,21 +190,21 @@ class EditWallPanel:
         self.heading_label = QtWidgets.QLabel()
 
         calculated_layout.addRow(
-            "Kierunek bezwzględny:",
+            "Absolute Heading:",
             self.heading_label,
         )
 
         self.start_label = QtWidgets.QLabel()
 
         calculated_layout.addRow(
-            "Początek:",
+            "Start:",
             self.start_label,
         )
 
         self.end_label = QtWidgets.QLabel()
 
         calculated_layout.addRow(
-            "Koniec:",
+            "End:",
             self.end_label,
         )
 
@@ -208,7 +213,7 @@ class EditWallPanel:
         )
 
         self.apply_button = QtWidgets.QPushButton(
-            "Zastosuj"
+            "Apply"
         )
 
         main_layout.addWidget(
@@ -216,7 +221,7 @@ class EditWallPanel:
         )
 
         self.close_button = QtWidgets.QPushButton(
-            "Zamknij"
+            "Close"
         )
 
         main_layout.addWidget(
@@ -254,7 +259,7 @@ class EditWallPanel:
             self.wall.Height.Value
         )
 
-        index = self.reference_combo.findText(
+        index = self.reference_combo.findData(
             str(
                 self.wall.ReferenceLine
             )
@@ -277,13 +282,13 @@ class EditWallPanel:
                 and walls[0] == self.wall
             ):
                 self.angle_info.setText(
-                    "Pierwsza ściana: "
-                    "kąt względem osi X."
+                    "First wall: "
+                    "angle from the X axis."
                 )
 
             else:
                 self.angle_info.setText(
-                    "Kąt względem poprzedniej ściany."
+                    "Angle from the previous wall."
                 )
 
         if getattr(
@@ -292,8 +297,8 @@ class EditWallPanel:
             False,
         ):
             self.angle_info.setText(
-                "Automatyczna ściana zamykająca. "
-                "Długość i kąt są wyliczane."
+                "Automatic closing wall. "
+                "Length and angle are calculated."
             )
 
             self.length_input.setEnabled(
@@ -313,7 +318,7 @@ class EditWallPanel:
             return
 
         document.openTransaction(
-            "Edytuj ścianę"
+            "Edit Wall"
         )
 
         try:
@@ -339,7 +344,7 @@ class EditWallPanel:
             )
 
             self.wall.ReferenceLine = (
-                self.reference_combo.currentText()
+                self.reference_combo.currentData()
             )
 
             rebuild_from_wall(
@@ -368,7 +373,7 @@ class EditWallPanel:
             document.abortTransaction()
 
             App.Console.PrintError(
-                "OpenInteriorCAD: błąd edycji ściany: "
+                "OpenInteriorCAD wall edit error: "
                 f"{error}\n"
             )
 

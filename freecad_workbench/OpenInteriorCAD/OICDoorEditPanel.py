@@ -22,7 +22,7 @@ class DoorEditPanel:
         self._updating = False
 
         self.form = QtWidgets.QWidget()
-        self.form.setWindowTitle("Edytuj drzwi")
+        self.form.setWindowTitle("Edit Door")
 
         self._build_ui()
         self._load_values()
@@ -34,7 +34,7 @@ class DoorEditPanel:
 
         title = QtWidgets.QLabel(
             "<b>OpenInteriorCAD</b><br>"
-            "Edytuj drzwi"
+            "Edit Door"
         )
         layout.addWidget(title)
 
@@ -43,11 +43,11 @@ class DoorEditPanel:
         layout.addWidget(self.info_label)
 
         # ------------------------------------------
-        # WYMIARY
+        # DIMENSIONS
         # ------------------------------------------
 
         dimensions_group = QtWidgets.QGroupBox(
-            "Wymiary i położenie"
+            "Dimensions and Position"
         )
 
         dimensions_layout = QtWidgets.QFormLayout(
@@ -63,7 +63,7 @@ class DoorEditPanel:
         self.width_input.setSuffix(" mm")
 
         dimensions_layout.addRow(
-            "Szerokość:",
+            "Width:",
             self.width_input,
         )
 
@@ -76,7 +76,7 @@ class DoorEditPanel:
         self.height_input.setSuffix(" mm")
 
         dimensions_layout.addRow(
-            "Wysokość:",
+            "Height:",
             self.height_input,
         )
 
@@ -89,7 +89,7 @@ class DoorEditPanel:
         self.offset_input.setSuffix(" mm")
 
         dimensions_layout.addRow(
-            "Od początku ściany:",
+            "From Wall Start:",
             self.offset_input,
         )
 
@@ -98,11 +98,11 @@ class DoorEditPanel:
         )
 
         # ------------------------------------------
-        # OTWIERANIE
+        # OPENING
         # ------------------------------------------
 
         swing_group = QtWidgets.QGroupBox(
-            "Otwieranie"
+            "Opening"
         )
 
         swing_layout = QtWidgets.QFormLayout(
@@ -111,29 +111,33 @@ class DoorEditPanel:
 
         self.side_combo = QtWidgets.QComboBox()
 
-        self.side_combo.addItems(
-            [
-                SWING_LEFT,
-                SWING_RIGHT,
-            ]
+        self.side_combo.addItem(
+            "Left",
+            SWING_LEFT,
+        )
+        self.side_combo.addItem(
+            "Right",
+            SWING_RIGHT,
         )
 
         swing_layout.addRow(
-            "Zawiasy:",
+            "Hinges:",
             self.side_combo,
         )
 
         self.direction_combo = QtWidgets.QComboBox()
 
-        self.direction_combo.addItems(
-            [
-                DIRECTION_IN,
-                DIRECTION_OUT,
-            ]
+        self.direction_combo.addItem(
+            "Inward",
+            DIRECTION_IN,
+        )
+        self.direction_combo.addItem(
+            "Outward",
+            DIRECTION_OUT,
         )
 
         swing_layout.addRow(
-            "Kierunek:",
+            "Direction:",
             self.direction_combo,
         )
 
@@ -142,11 +146,11 @@ class DoorEditPanel:
         )
 
         # ------------------------------------------
-        # PRZYCISKI
+        # BUTTONS
         # ------------------------------------------
 
         self.close_button = QtWidgets.QPushButton(
-            "Zamknij"
+            "Close"
         )
 
         layout.addWidget(
@@ -227,7 +231,7 @@ class DoorEditPanel:
             )
 
             side_index = (
-                self.side_combo.findText(
+                self.side_combo.findData(
                     str(
                         self.door.SwingSide
                     )
@@ -240,7 +244,7 @@ class DoorEditPanel:
                 )
 
             direction_index = (
-                self.direction_combo.findText(
+                self.direction_combo.findData(
                     str(
                         self.door.SwingDirection
                     )
@@ -254,8 +258,8 @@ class DoorEditPanel:
 
             self.info_label.setText(
                 f"<b>{self.door.Label}</b><br>"
-                f"Ściana: {self.wall.Label}<br>"
-                f"Długość ściany: "
+                f"Wall: {self.wall.Label}<br>"
+                f"Wall length: "
                 f"{wall_length:.0f} mm"
             )
 
@@ -310,11 +314,11 @@ class DoorEditPanel:
             )
 
             self.door.SwingSide = (
-                self.side_combo.currentText()
+                self.side_combo.currentData()
             )
 
             self.door.SwingDirection = (
-                self.direction_combo.currentText()
+                self.direction_combo.currentData()
             )
 
             self.door.Document.recompute()
@@ -326,7 +330,7 @@ class DoorEditPanel:
 
         except Exception as error:
             App.Console.PrintError(
-                "OpenInteriorCAD: błąd edycji drzwi: "
+                "OpenInteriorCAD door edit error: "
                 f"{error}\n"
             )
 

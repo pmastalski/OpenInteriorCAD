@@ -279,7 +279,7 @@ def create_furniture(
         name,
     )
 
-    obj.Label = "Szafka"
+    obj.Label = "Cabinet"
 
     FurnitureProxy(
         obj,

@@ -20,7 +20,7 @@ class DoorPanel:
         self.form = QtWidgets.QWidget()
 
         self.form.setWindowTitle(
-            "Dodaj drzwi"
+            "Add Door"
         )
 
         self._build_ui()
@@ -33,7 +33,7 @@ class DoorPanel:
 
         title = QtWidgets.QLabel(
             "<b>OpenInteriorCAD</b><br>"
-            "Dodaj drzwi"
+            "Add Door"
         )
 
         main_layout.addWidget(
@@ -51,7 +51,7 @@ class DoorPanel:
         )
 
         parameters_group = QtWidgets.QGroupBox(
-            "Parametry drzwi"
+            "Door Parameters"
         )
 
         parameters_layout = QtWidgets.QFormLayout(
@@ -78,7 +78,7 @@ class DoorPanel:
         )
 
         parameters_layout.addRow(
-            "Szerokość:",
+            "Width:",
             self.width_input,
         )
 
@@ -102,7 +102,7 @@ class DoorPanel:
         )
 
         parameters_layout.addRow(
-            "Wysokość:",
+            "Height:",
             self.height_input,
         )
 
@@ -126,7 +126,7 @@ class DoorPanel:
         )
 
         parameters_layout.addRow(
-            "Od początku ściany:",
+            "From Wall Start:",
             self.offset_input,
         )
 
@@ -135,8 +135,8 @@ class DoorPanel:
         )
 
         self.info_label = QtWidgets.QLabel(
-            "Odległość jest liczona od początku "
-            "osi wybranej ściany."
+            "Distance is measured from the start "
+            "of the selected wall axis."
         )
 
         self.info_label.setWordWrap(
@@ -148,7 +148,7 @@ class DoorPanel:
         )
 
         self.add_button = QtWidgets.QPushButton(
-            "Dodaj drzwi"
+            "Add Door"
         )
 
         main_layout.addWidget(
@@ -156,7 +156,7 @@ class DoorPanel:
         )
 
         self.close_button = QtWidgets.QPushButton(
-            "Zamknij"
+            "Close"
         )
 
         main_layout.addWidget(
@@ -176,8 +176,8 @@ class DoorPanel:
     def _load_wall(self):
         self.wall_label.setText(
             (
-                f"<b>Ściana:</b> {self.wall.Label}<br>"
-                f"Długość: {self.wall.Length.Value:.0f} mm"
+                f"<b>Wall:</b> {self.wall.Label}<br>"
+                f"Length: {self.wall.Length.Value:.0f} mm"
             )
         )
 
@@ -227,16 +227,16 @@ class DoorPanel:
         if width >= self.wall.Length.Value:
             QtWidgets.QMessageBox.warning(
                 Gui.getMainWindow(),
-                "Dodaj drzwi",
+                "Add Door",
                 (
-                    "Szerokość drzwi musi być "
-                    "mniejsza od długości ściany."
+                    "Door width must be smaller "
+                    "than the wall length."
                 ),
             )
             return
 
         document.openTransaction(
-            "Dodaj drzwi"
+            "Add Door"
         )
 
         try:
@@ -263,7 +263,7 @@ class DoorPanel:
             document.abortTransaction()
 
             App.Console.PrintError(
-                "OpenInteriorCAD: błąd dodawania drzwi: "
+                "OpenInteriorCAD door add error: "
                 f"{error}\n"
             )
             return
@@ -276,7 +276,7 @@ class DoorPanel:
 
         self.info_label.setText(
             (
-                "Drzwi dodane: "
+                "Door added: "
                 f"{width:.0f} × {height:.0f} mm, "
                 f"offset {offset:.0f} mm."
             )

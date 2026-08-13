@@ -663,7 +663,7 @@ def create_door(
         name,
     )
 
-    obj.Label = "Drzwi"
+    obj.Label = "Door"
 
     DoorProxy(
         obj,

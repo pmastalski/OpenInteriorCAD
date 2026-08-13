@@ -14,7 +14,7 @@ class FurnitureEditPanel:
 
         self.form = QtWidgets.QWidget()
         self.form.setWindowTitle(
-            "Edytuj mebel"
+            "Edit Furniture"
         )
 
         self._build_ui()
@@ -27,7 +27,7 @@ class FurnitureEditPanel:
 
         title = QtWidgets.QLabel(
             "<b>OpenInteriorCAD</b><br>"
-            "Edytuj mebel"
+            "Edit Furniture"
         )
 
         layout.addWidget(
@@ -45,11 +45,11 @@ class FurnitureEditPanel:
         )
 
         # --------------------------------------------------
-        # WYMIARY
+        # DIMENSIONS
         # --------------------------------------------------
 
         dimensions_group = QtWidgets.QGroupBox(
-            "Wymiary"
+            "Dimensions"
         )
 
         dimensions_layout = QtWidgets.QFormLayout(
@@ -65,7 +65,7 @@ class FurnitureEditPanel:
         self.width_input.setSuffix(" mm")
 
         dimensions_layout.addRow(
-            "Szerokość:",
+            "Width:",
             self.width_input,
         )
 
@@ -78,7 +78,7 @@ class FurnitureEditPanel:
         self.depth_input.setSuffix(" mm")
 
         dimensions_layout.addRow(
-            "Głębokość:",
+            "Depth:",
             self.depth_input,
         )
 
@@ -91,7 +91,7 @@ class FurnitureEditPanel:
         self.height_input.setSuffix(" mm")
 
         dimensions_layout.addRow(
-            "Wysokość:",
+            "Height:",
             self.height_input,
         )
 
@@ -100,11 +100,11 @@ class FurnitureEditPanel:
         )
 
         # --------------------------------------------------
-        # POŁOŻENIE
+        # POSITION
         # --------------------------------------------------
 
         position_group = QtWidgets.QGroupBox(
-            "Położenie"
+            "Position"
         )
 
         position_layout = QtWidgets.QFormLayout(
@@ -159,7 +159,7 @@ class FurnitureEditPanel:
         self.rotation_input.setSuffix("°")
 
         position_layout.addRow(
-            "Obrót:",
+            "Rotation:",
             self.rotation_input,
         )
 
@@ -168,7 +168,7 @@ class FurnitureEditPanel:
         )
 
         # --------------------------------------------------
-        # SZYBKIE OBROTY
+        # QUICK ROTATIONS
         # --------------------------------------------------
 
         rotation_layout = QtWidgets.QHBoxLayout()
@@ -210,7 +210,7 @@ class FurnitureEditPanel:
         )
 
         self.close_button = QtWidgets.QPushButton(
-            "Zamknij"
+            "Close"
         )
 
         layout.addWidget(

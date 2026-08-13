@@ -57,7 +57,7 @@ def get_dimensions_group(
         "Dimensions",
     )
 
-    group.Label = "Wymiary"
+    group.Label = "Dimensions"
 
     if "OICType" not in group.PropertiesList:
         group.addProperty(
@@ -673,7 +673,7 @@ def create_dimension(
     )
 
     dimension.Label = (
-        f"Wymiar {wall.Label}"
+        f"Dimension {wall.Label}"
     )
 
     DimensionProxy(

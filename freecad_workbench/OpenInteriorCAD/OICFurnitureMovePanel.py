@@ -9,10 +9,10 @@ from PySide import QtWidgets
 from OICFurnitureMove import (
     FurnitureMoveTool,
 )
-
 from OICFurnitureWallOffset import (
     FurnitureWallOffsetTool,
 )
+
 
 class FurnitureMovePanel:
     """Precise movement and positioning panel."""
@@ -29,6 +29,7 @@ class FurnitureMovePanel:
         self.wall_tool = None
 
         self.form = QtWidgets.QWidget()
+
         self.form.setWindowTitle(
             "Move Furniture"
         )
@@ -167,8 +168,6 @@ class FurnitureMovePanel:
             step_layout
         )
 
-        # Direction layout
-
         direction_grid = (
             QtWidgets.QGridLayout()
         )
@@ -225,8 +224,6 @@ class FurnitureMovePanel:
             direction_grid
         )
 
-        # Quick steps
-
         quick_label = QtWidgets.QLabel(
             "Quick Step"
         )
@@ -266,6 +263,118 @@ class FurnitureMovePanel:
         )
 
         # ==================================================
+        # ROTATE
+        # ==================================================
+
+        rotate_group = QtWidgets.QGroupBox(
+            "Rotate"
+        )
+
+        rotate_layout = QtWidgets.QVBoxLayout(
+            rotate_group
+        )
+
+        angle_form = QtWidgets.QFormLayout()
+
+        self.angle_step_input = (
+            QtWidgets.QDoubleSpinBox()
+        )
+
+        self.angle_step_input.setRange(
+            0.1,
+            360.0,
+        )
+
+        self.angle_step_input.setDecimals(
+            1
+        )
+
+        self.angle_step_input.setValue(
+            5.0
+        )
+
+        self.angle_step_input.setSuffix(
+            "°"
+        )
+
+        angle_form.addRow(
+            "Angle Step:",
+            self.angle_step_input,
+        )
+
+        rotate_layout.addLayout(
+            angle_form
+        )
+
+        rotate_buttons = (
+            QtWidgets.QHBoxLayout()
+        )
+
+        self.rotate_left_button = (
+            QtWidgets.QPushButton(
+                "↺ Left"
+            )
+        )
+
+        self.rotate_right_button = (
+            QtWidgets.QPushButton(
+                "Right ↻"
+            )
+        )
+
+        rotate_buttons.addWidget(
+            self.rotate_left_button
+        )
+
+        rotate_buttons.addWidget(
+            self.rotate_right_button
+        )
+
+        rotate_layout.addLayout(
+            rotate_buttons
+        )
+
+        quick_angle_label = QtWidgets.QLabel(
+            "Quick Angle"
+        )
+
+        rotate_layout.addWidget(
+            quick_angle_label
+        )
+
+        quick_angle_layout = (
+            QtWidgets.QHBoxLayout()
+        )
+
+        for value in [
+            1,
+            5,
+            15,
+            45,
+            90,
+        ]:
+            button = QtWidgets.QPushButton(
+                f"{value}°"
+            )
+
+            button.clicked.connect(
+                lambda checked=False, v=value:
+                self.angle_step_input.setValue(v)
+            )
+
+            quick_angle_layout.addWidget(
+                button
+            )
+
+        rotate_layout.addLayout(
+            quick_angle_layout
+        )
+
+        layout.addWidget(
+            rotate_group
+        )
+
+        # ==================================================
         # WALL OFFSET
         # ==================================================
 
@@ -299,7 +408,7 @@ class FurnitureMovePanel:
         )
 
         wall_layout.addRow(
-            "Back Offset:",
+            "Offset:",
             self.wall_offset_input,
         )
 
@@ -377,6 +486,14 @@ class FurnitureMovePanel:
 
         self.back_button.clicked.connect(
             self._move_back
+        )
+
+        self.rotate_left_button.clicked.connect(
+            self._rotate_left
+        )
+
+        self.rotate_right_button.clicked.connect(
+            self._rotate_right
         )
 
         self.set_from_wall_button.clicked.connect(
@@ -497,12 +614,18 @@ class FurnitureMovePanel:
             local_y,
         )
 
+    # ==================================================
+    # NUDGE
+    # ==================================================
+
     def _nudge(
         self,
         dx,
         dy,
     ):
-        step = self.step_input.value()
+        step = (
+            self.step_input.value()
+        )
 
         local_x, local_y = (
             self._local_axes()
@@ -564,11 +687,164 @@ class FurnitureMovePanel:
         )
 
     # ==================================================
+    # ROTATION AROUND CENTRE
+    # ==================================================
+
+    def _furniture_centre(self):
+        """
+        Return the current footprint centre
+        of the furniture.
+        """
+
+        angle = math.radians(
+            self.furniture.RotationAngle.Value
+        )
+
+        local_x = App.Vector(
+            math.cos(angle),
+            math.sin(angle),
+            0.0,
+        )
+
+        local_y = App.Vector(
+            -math.sin(angle),
+            math.cos(angle),
+            0.0,
+        )
+
+        half_width = (
+            self.furniture.Width.Value
+            / 2.0
+        )
+
+        half_depth = (
+            self.furniture.Depth.Value
+            / 2.0
+        )
+
+        return App.Vector(
+            self.furniture.Position.x
+            + local_x.x * half_width
+            + local_y.x * half_depth,
+
+            self.furniture.Position.y
+            + local_x.y * half_width
+            + local_y.y * half_depth,
+
+            self.furniture.Position.z,
+        )
+
+    def _rotate_about_centre(
+        self,
+        delta_angle,
+    ):
+        """
+        Rotate furniture while keeping its
+        footprint centre fixed.
+        """
+
+        centre = (
+            self._furniture_centre()
+        )
+
+        current_rotation = (
+            self.furniture.RotationAngle.Value
+        )
+
+        new_rotation = (
+            current_rotation
+            + delta_angle
+        )
+
+        new_rotation = (
+            new_rotation + 180.0
+        ) % 360.0 - 180.0
+
+        angle = math.radians(
+            new_rotation
+        )
+
+        local_x = App.Vector(
+            math.cos(angle),
+            math.sin(angle),
+            0.0,
+        )
+
+        local_y = App.Vector(
+            -math.sin(angle),
+            math.cos(angle),
+            0.0,
+        )
+
+        half_width = (
+            self.furniture.Width.Value
+            / 2.0
+        )
+
+        half_depth = (
+            self.furniture.Depth.Value
+            / 2.0
+        )
+
+        new_position = App.Vector(
+            centre.x
+            - local_x.x * half_width
+            - local_y.x * half_depth,
+
+            centre.y
+            - local_x.y * half_width
+            - local_y.y * half_depth,
+
+            self.furniture.Position.z,
+        )
+
+        self.furniture.Document.openTransaction(
+            "Rotate Furniture"
+        )
+
+        try:
+            self.furniture.RotationAngle = (
+                new_rotation
+            )
+
+            self.furniture.Position = (
+                new_position
+            )
+
+            self.furniture.Document.recompute()
+
+            self.furniture.Document.commitTransaction()
+
+        except Exception:
+            self.furniture.Document.abortTransaction()
+            raise
+
+        self.refresh()
+
+    def _rotate_left(self):
+        step = (
+            self.angle_step_input.value()
+        )
+
+        self._rotate_about_centre(
+            step
+        )
+
+    def _rotate_right(self):
+        step = (
+            self.angle_step_input.value()
+        )
+
+        self._rotate_about_centre(
+            -step
+        )
+
+    # ==================================================
     # WALL OFFSET
     # ==================================================
 
     def _set_from_wall(self):
-        """Set perpendicular cabinet distance from wall."""
+        """Set exact clearance from selected wall."""
 
         if (
             self.wall_tool is not None
@@ -576,12 +852,16 @@ class FurnitureMovePanel:
         ):
             self.wall_tool.stop()
 
-        offset = self.wall_offset_input.value()
+        offset = (
+            self.wall_offset_input.value()
+        )
 
-        self.wall_tool = FurnitureWallOffsetTool(
-            furniture=self.furniture,
-            offset=offset,
-            on_finished=self._wall_finished,
+        self.wall_tool = (
+            FurnitureWallOffsetTool(
+                furniture=self.furniture,
+                offset=offset,
+                on_finished=self._wall_finished,
+            )
         )
 
         self.wall_tool.start()
@@ -594,7 +874,7 @@ class FurnitureMovePanel:
         self.refresh()
 
         self.status_label.setText(
-            "Wall position applied."
+            "Wall offset applied."
         )
 
     # ==================================================

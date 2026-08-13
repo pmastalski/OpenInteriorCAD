@@ -556,7 +556,7 @@ def create_window(
         name,
     )
 
-    obj.Label = "Okno"
+    obj.Label = "Window"
 
     WindowProxy(
         obj,

@@ -1,6 +1,7 @@
 """Window commands for OpenInteriorCAD."""
 
 import FreeCADGui as Gui
+from OICIcons import icon
 from PySide import QtWidgets
 
 from OICWindowEditPanel import WindowEditPanel
@@ -12,11 +13,9 @@ class AddWindowCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Dodaj okno",
-            "ToolTip": (
-                "Dodaje okno do zaznaczonej "
-                "ściany OpenInteriorCAD."
-            ),
+            "Pixmap": icon("add_window.svg"),
+            "MenuText": "Add Window",
+            "ToolTip": "Add a window to the selected wall.",
         }
 
     def IsActive(self):
@@ -69,11 +68,9 @@ class EditWindowCommand:
 
     def GetResources(self):
         return {
-            "MenuText": "Edytuj okno",
-            "ToolTip": (
-                "Edytuje wymiary i położenie "
-                "zaznaczonego okna."
-            ),
+            "Pixmap": icon("edit_window.svg"),
+            "MenuText": "Edit Window",
+            "ToolTip": "Edit the selected window.",
         }
 
     def IsActive(self):
