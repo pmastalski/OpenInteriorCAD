@@ -17,9 +17,21 @@ class OpenInteriorCADWorkbench(Gui.Workbench):
 
     def Initialize(self):
         import OICCommands
+        import OICFloorCommands
+        import OICFurnitureCommands
+        import OICWindowCommands
 
         self.command_list = [
-            "OIC_AddWall",
+            "OIC_DrawRoomV2",
+            "OIC_EditWallV2",
+            "OIC_AddDoor",
+            "OIC_EditDoor",
+            "OIC_AddWindow",
+            "OIC_EditWindow",
+            "OIC_AddFloor",
+            "OIC_AddFurniture",
+            "OIC_EditFurniture",
+            "OIC_MoveFurniture",
         ]
 
         self.appendToolbar(
@@ -38,7 +50,10 @@ class OpenInteriorCADWorkbench(Gui.Workbench):
     def Deactivated(self):
         pass
 
-    def ContextMenu(self, recipient):
+    def ContextMenu(
+        self,
+        recipient,
+    ):
         self.appendContextMenu(
             "OpenInteriorCAD",
             self.command_list,
