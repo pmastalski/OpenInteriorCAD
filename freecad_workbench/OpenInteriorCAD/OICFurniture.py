@@ -15,6 +15,8 @@ Move, Snap, Duplicate and Cabinet Run tools.
 import FreeCAD as App
 import Part
 
+from OICBoardParts import build_board_parts, board_parts_json
+
 
 FURNITURE_TYPE = "OpenInteriorCAD::Furniture"
 
@@ -1687,6 +1689,166 @@ class FurnitureProxy:
             use_plinth=True,
         )
 
+    def _ensure_board_part_properties(
+        self,
+        obj,
+    ):
+        """Add non-geometric production metadata properties."""
+
+        if not hasattr(
+            obj,
+            "BoardPartsJSON",
+        ):
+            obj.addProperty(
+                "App::PropertyString",
+                "BoardPartsJSON",
+                "Production",
+                "Serialized logical board-part list for BOM / Cut List.",
+            )
+
+        if not hasattr(
+            obj,
+            "BoardPartCount",
+        ):
+            obj.addProperty(
+                "App::PropertyInteger",
+                "BoardPartCount",
+                "Production",
+                "Number of logical board parts in this cabinet.",
+            )
+
+        if not hasattr(
+            obj,
+            "BoardMaterial",
+        ):
+            obj.addProperty(
+                "App::PropertyString",
+                "BoardMaterial",
+                "Production",
+                "Material used for carcass boards.",
+            )
+            obj.BoardMaterial = "Carcass Board"
+
+        if not hasattr(
+            obj,
+            "FrontMaterial",
+        ):
+            obj.addProperty(
+                "App::PropertyString",
+                "FrontMaterial",
+                "Production",
+                "Material used for fronts.",
+            )
+            obj.FrontMaterial = "Front Board"
+
+        if not hasattr(
+            obj,
+            "BackMaterial",
+        ):
+            obj.addProperty(
+                "App::PropertyString",
+                "BackMaterial",
+                "Production",
+                "Material used for back panels.",
+            )
+            obj.BackMaterial = "Back Board"
+
+        if not hasattr(
+            obj,
+            "EdgeMaterial",
+        ):
+            obj.addProperty(
+                "App::PropertyString",
+                "EdgeMaterial",
+                "Production",
+                "Default edge-band material.",
+            )
+            obj.EdgeMaterial = "ABS"
+
+        if not hasattr(
+            obj,
+            "EdgeThickness",
+        ):
+            obj.addProperty(
+                "App::PropertyLength",
+                "EdgeThickness",
+                "Production",
+                "Default edge-band thickness.",
+            )
+            obj.EdgeThickness = 0.8
+
+        if not hasattr(
+            obj,
+            "EdgeOverridesJSON",
+        ):
+            obj.addProperty(
+                "App::PropertyString",
+                "EdgeOverridesJSON",
+                "Production",
+                "Per-part edge-band overrides used by Cut List.",
+            )
+            obj.EdgeOverridesJSON = "{}"
+
+        try:
+            obj.setEditorMode(
+                "BoardPartsJSON",
+                1,
+            )
+
+            obj.setEditorMode(
+                "BoardPartCount",
+                1,
+            )
+
+            obj.setEditorMode(
+                "EdgeOverridesJSON",
+                1,
+            )
+
+        except Exception:
+            pass
+
+
+    def _update_board_parts(
+        self,
+        obj,
+    ):
+        """
+        Rebuild logical production parts from current cabinet parameters.
+
+        This does not change Shape and therefore cannot disturb the accepted
+        cabinet geometry.
+        """
+
+        self._ensure_board_part_properties(
+            obj
+        )
+
+        try:
+            parts = build_board_parts(
+                obj
+            )
+        except Exception:
+            parts = []
+
+        try:
+            obj.BoardPartCount = len(
+                parts
+            )
+        except Exception:
+            pass
+
+        try:
+            obj.BoardPartsJSON = board_parts_json(
+                parts
+            )
+        except Exception:
+            try:
+                obj.BoardPartsJSON = "[]"
+            except Exception:
+                pass
+
+
     def _corner_dimensions_ready(
         self,
         obj,
@@ -1770,6 +1932,10 @@ class FurnitureProxy:
             obj
         ):
             return
+
+        self._update_board_parts(
+            obj
+        )
 
         if str(
             obj.GeometryMode
@@ -1918,6 +2084,14 @@ class FurnitureProxy:
         self,
         obj,
     ):
+        self._ensure_board_part_properties(
+            obj
+        )
+
+        self._update_board_parts(
+            obj
+        )
+
         self._add_properties(
             obj
         )

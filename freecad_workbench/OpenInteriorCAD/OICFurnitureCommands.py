@@ -2,19 +2,18 @@
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from OICIcons import icon
+from PySide import QtWidgets
+
+from OICCutListPanel import CutListPanel
+from OICEdgeAssignmentPanel import EdgeAssignmentPanel
+from OICFurniture import create_furniture
 from OICFurnitureDuplicatePanel import (
     FurnitureDuplicatePanel,
 )
-from PySide import QtWidgets
-
-from OICFurniture import create_furniture
 from OICFurnitureEditPanel import FurnitureEditPanel
-
 from OICFurnitureMovePanel import (
     FurnitureMovePanel,
 )
-
 from OICFurniturePanel import FurniturePanel
 from OICFurnitureSnapFurniture import (
     FurnitureSnapFurnitureTool,
@@ -22,6 +21,7 @@ from OICFurnitureSnapFurniture import (
 from OICFurnitureSnapWall import (
     FurnitureSnapWallTool,
 )
+from OICIcons import icon
 
 
 ACTIVE_FURNITURE_TOOL = None
@@ -38,8 +38,9 @@ def get_selected_furniture(title):
         QtWidgets.QMessageBox.warning(
             Gui.getMainWindow(),
             title,
-            "Zaznacz dokładnie jeden mebel.",
+            "Select exactly one cabinet.",
         )
+
         return None
 
     furniture = selection[0]
@@ -55,8 +56,9 @@ def get_selected_furniture(title):
         QtWidgets.QMessageBox.warning(
             Gui.getMainWindow(),
             title,
-            "Zaznaczony obiekt nie jest meblem.",
+            "The selected object is not a cabinet.",
         )
+
         return None
 
     return furniture
@@ -99,7 +101,9 @@ def stop_active_tools():
 class FurniturePlacementTool:
     """Interactive cabinet placement tool."""
 
-    def __init__(self):
+    def __init__(
+        self,
+    ):
         self.document = None
         self.view = None
         self.panel = None
@@ -114,7 +118,9 @@ class FurniturePlacementTool:
         self.active = False
         self.waiting_for_point = False
 
-    def start(self):
+    def start(
+        self,
+    ):
         global ACTIVE_FURNITURE_TOOL
 
         self.document = App.ActiveDocument
@@ -202,6 +208,7 @@ class FurniturePlacementTool:
                 "OpenInteriorCAD furniture point error: "
                 f"{error}\n"
             )
+
             return
 
         self.waiting_for_point = False
@@ -215,7 +222,7 @@ class FurniturePlacementTool:
         )
 
         self.document.openTransaction(
-            "Wstaw szafkę"
+            "Insert Cabinet"
         )
 
         try:
@@ -236,9 +243,10 @@ class FurniturePlacementTool:
             self.document.abortTransaction()
 
             App.Console.PrintError(
-                "OpenInteriorCAD: błąd wstawiania mebla: "
+                "OpenInteriorCAD cabinet insertion error: "
                 f"{error}\n"
             )
+
             return
 
         Gui.Selection.clearSelection()
@@ -252,7 +260,9 @@ class FurniturePlacementTool:
                 furniture
             )
 
-    def _remove_callback(self):
+    def _remove_callback(
+        self,
+    ):
         if (
             self.view is not None
             and self.callback is not None
@@ -262,6 +272,7 @@ class FurniturePlacementTool:
                     "SoMouseButtonEvent",
                     self.callback,
                 )
+
             except Exception:
                 pass
 
@@ -290,17 +301,25 @@ class FurniturePlacementTool:
 class AddFurnitureCommand:
     """Insert a parametric cabinet."""
 
-    def GetResources(self):
+    def GetResources(
+        self,
+    ):
         return {
-            "Pixmap": icon("add_cabinet.svg"),
+            "Pixmap": icon(
+                "add_cabinet.svg"
+            ),
             "MenuText": "Add Cabinet",
             "ToolTip": "Add a parametric cabinet.",
         }
 
-    def IsActive(self):
+    def IsActive(
+        self,
+    ):
         return True
 
-    def Activated(self):
+    def Activated(
+        self,
+    ):
         stop_active_tools()
 
         if Gui.Control.activeDialog():
@@ -314,24 +333,32 @@ class AddFurnitureCommand:
 class EditFurnitureCommand:
     """Edit selected furniture."""
 
-    def GetResources(self):
+    def GetResources(
+        self,
+    ):
         return {
-            "Pixmap": icon("edit_furniture.svg"),
+            "Pixmap": icon(
+                "edit_furniture.svg"
+            ),
             "MenuText": "Edit Furniture",
             "ToolTip": "Edit dimensions, position and rotation.",
         }
 
-    def IsActive(self):
+    def IsActive(
+        self,
+    ):
         return True
 
-    def Activated(self):
+    def Activated(
+        self,
+    ):
         stop_active_tools()
 
         if Gui.Control.activeDialog():
             Gui.Control.closeDialog()
 
         furniture = get_selected_furniture(
-            "Edytuj mebel"
+            "Edit Furniture"
         )
 
         if furniture is None:
@@ -345,20 +372,29 @@ class EditFurnitureCommand:
             panel
         )
 
+
 class MoveFurnitureCommand:
     """Open precise furniture movement panel."""
 
-    def GetResources(self):
+    def GetResources(
+        self,
+    ):
         return {
-            "Pixmap": icon("move_furniture.svg"),
+            "Pixmap": icon(
+                "move_furniture.svg"
+            ),
             "MenuText": "Move Furniture",
             "ToolTip": "Precisely move, nudge, rotate and position furniture.",
         }
 
-    def IsActive(self):
+    def IsActive(
+        self,
+    ):
         return True
 
-    def Activated(self):
+    def Activated(
+        self,
+    ):
         stop_active_tools()
 
         if Gui.Control.activeDialog():
@@ -383,23 +419,31 @@ class MoveFurnitureCommand:
 class SnapFurnitureToWallCommand:
     """Snap furniture back edge to selected wall."""
 
-    def GetResources(self):
+    def GetResources(
+        self,
+    ):
         return {
-            "Pixmap": icon("snap_wall.svg"),
+            "Pixmap": icon(
+                "snap_wall.svg"
+            ),
             "MenuText": "Snap to Wall",
             "ToolTip": "Snap the cabinet back edge to a selected wall.",
         }
 
-    def IsActive(self):
+    def IsActive(
+        self,
+    ):
         return True
 
-    def Activated(self):
+    def Activated(
+        self,
+    ):
         global ACTIVE_SNAP_TOOL
 
         stop_active_tools()
 
         furniture = get_selected_furniture(
-            "Dosuń do ściany"
+            "Snap to Wall"
         )
 
         if furniture is None:
@@ -417,23 +461,31 @@ class SnapFurnitureToWallCommand:
 class SnapFurnitureToFurnitureCommand:
     """Snap furniture side-to-side."""
 
-    def GetResources(self):
+    def GetResources(
+        self,
+    ):
         return {
-            "Pixmap": icon("snap_cabinet.svg"),
+            "Pixmap": icon(
+                "snap_cabinet.svg"
+            ),
             "MenuText": "Snap to Cabinet",
             "ToolTip": "Snap the selected cabinet side-to-side with another cabinet.",
         }
 
-    def IsActive(self):
+    def IsActive(
+        self,
+    ):
         return True
 
-    def Activated(self):
+    def Activated(
+        self,
+    ):
         global ACTIVE_SNAP_TOOL
 
         stop_active_tools()
 
         furniture = get_selected_furniture(
-            "Dosuń do szafki"
+            "Snap to Cabinet"
         )
 
         if furniture is None:
@@ -446,27 +498,37 @@ class SnapFurnitureToFurnitureCommand:
         ACTIVE_SNAP_TOOL = tool
 
         tool.start()
+
+
 class DuplicateFurnitureCommand:
     """Duplicate selected furniture."""
 
-    def GetResources(self):
+    def GetResources(
+        self,
+    ):
         return {
-            "Pixmap": icon("duplicate_cabinet.svg"),
+            "Pixmap": icon(
+                "duplicate_cabinet.svg"
+            ),
             "MenuText": "Duplicate Cabinet",
             "ToolTip": "Duplicate the cabinet to the left or right.",
         }
 
-    def IsActive(self):
+    def IsActive(
+        self,
+    ):
         return True
 
-    def Activated(self):
+    def Activated(
+        self,
+    ):
         stop_active_tools()
 
         if Gui.Control.activeDialog():
             Gui.Control.closeDialog()
 
         furniture = get_selected_furniture(
-            "Duplikuj szafkę"
+            "Duplicate Cabinet"
         )
 
         if furniture is None:
@@ -479,6 +541,92 @@ class DuplicateFurnitureCommand:
         Gui.Control.showDialog(
             panel
         )
+
+
+class EdgeAssignmentCommand:
+    """Edit edge-band assignment for selected cabinet."""
+
+    def GetResources(
+        self,
+    ):
+        return {
+            "MenuText": "Edge Assignment",
+            "ToolTip": (
+                "Choose Front / Back / Left / Right edge banding "
+                "for logical cabinet parts."
+            ),
+        }
+
+    def IsActive(
+        self,
+    ):
+        return App.ActiveDocument is not None
+
+    def Activated(
+        self,
+    ):
+        stop_active_tools()
+
+        if Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+
+        furniture = get_selected_furniture(
+            "Edge Assignment"
+        )
+
+        if furniture is None:
+            return
+
+        # Old documents receive the new metadata property on demand.
+        try:
+            furniture.Proxy._ensure_board_part_properties(
+                furniture
+            )
+        except Exception:
+            pass
+
+        panel = EdgeAssignmentPanel(
+            furniture
+        )
+
+        Gui.Control.showDialog(
+            panel
+        )
+
+
+class CutListCommand:
+    """Show logical board parts for selected cabinets or the document."""
+
+    def GetResources(
+        self,
+    ):
+        return {
+            "MenuText": "Cut List",
+            "ToolTip": (
+                "Show board dimensions for selected cabinets. "
+                "If nothing is selected, show all cabinets."
+            ),
+        }
+
+    def IsActive(
+        self,
+    ):
+        return App.ActiveDocument is not None
+
+    def Activated(
+        self,
+    ):
+        stop_active_tools()
+
+        if Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+
+        panel = CutListPanel()
+
+        Gui.Control.showDialog(
+            panel
+        )
+
 
 Gui.addCommand(
     "OIC_AddFurniture",
@@ -508,4 +656,14 @@ Gui.addCommand(
 Gui.addCommand(
     "OIC_DuplicateFurniture",
     DuplicateFurnitureCommand(),
+)
+
+Gui.addCommand(
+    "OIC_EdgeAssignment",
+    EdgeAssignmentCommand(),
+)
+
+Gui.addCommand(
+    "OIC_CutList",
+    CutListCommand(),
 )

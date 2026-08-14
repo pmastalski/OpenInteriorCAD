@@ -1,18 +1,12 @@
 """Furniture duplication helpers for OpenInteriorCAD."""
 
 import math
-
 import FreeCAD as App
-
-
-FURNITURE_TYPE = "OpenInteriorCAD::Furniture"
 
 
 def furniture_x_axis(
     furniture,
 ):
-    """Return local +X direction of furniture."""
-
     angle = math.radians(
         furniture.RotationAngle.Value
     )
@@ -28,13 +22,7 @@ def duplicate_furniture(
     furniture,
     side="right",
 ):
-    """
-    Duplicate furniture directly beside source.
-
-    side:
-        "left"
-        "right"
-    """
+    """Duplicate Cabinet and preserve standard/corner configuration."""
 
     document = furniture.Document
 
@@ -45,49 +33,89 @@ def duplicate_furniture(
         furniture
     )
 
-    source_position = furniture.Position
+    direction = (
+        -1.0
+        if side == "left"
+        else 1.0
+    )
 
-    source_width = furniture.Width.Value
-    source_depth = furniture.Depth.Value
-    source_height = furniture.Height.Value
+    new_position = App.Vector(
+        furniture.Position.x
+        + x_axis.x
+        * furniture.Width.Value
+        * direction,
+        furniture.Position.y
+        + x_axis.y
+        * furniture.Width.Value
+        * direction,
+        furniture.Position.z,
+    )
 
-    rotation = furniture.RotationAngle.Value
+    from OICFurniture import (
+        create_furniture,
+    )
 
-    # ----------------------------------------------
-    # POSITION
-    # ----------------------------------------------
+    kwargs = {
+        "width": furniture.Width.Value,
+        "depth": furniture.Depth.Value,
+        "height": furniture.Height.Value,
+        "rotation": furniture.RotationAngle.Value,
+    }
 
-    if side == "left":
-        new_position = App.Vector(
-            source_position.x
-            - x_axis.x * source_width,
-            source_position.y
-            - x_axis.y * source_width,
-            source_position.z,
+    mapping = {
+        "cabinet_type": "CabinetType",
+        "geometry_mode": "GeometryMode",
+        "panel_thickness": "PanelThickness",
+        "back_thickness": "BackThickness",
+        "shelf_count": "ShelfCount",
+        "plinth_height": "PlinthHeight",
+        "plinth_setback": "PlinthSetback",
+        "mount_height": "MountHeight",
+        "width_b": "WidthB",
+        "depth_b": "DepthB",
+        "front_type": "FrontType",
+        "front_thickness": "FrontThickness",
+        "front_gap": "FrontGap",
+        "drawer_count": "DrawerCount",
+        "drawer_zone_height": "DrawerZoneHeight",
+        "corner_opening_width": "CornerOpeningWidth",
+    }
+
+    for argument, property_name in mapping.items():
+        if property_name not in furniture.PropertiesList:
+            continue
+
+        value = getattr(
+            furniture,
+            property_name,
         )
 
-    else:
-        new_position = App.Vector(
-            source_position.x
-            + x_axis.x * source_width,
-            source_position.y
-            + x_axis.y * source_width,
-            source_position.z,
-        )
+        if property_name in {
+            "CabinetType",
+            "GeometryMode",
+            "FrontType",
+        }:
+            kwargs[argument] = str(
+                value
+            )
 
-    # ----------------------------------------------
-    # CREATE
-    # ----------------------------------------------
+        elif property_name in {
+            "ShelfCount",
+            "DrawerCount",
+        }:
+            kwargs[argument] = int(
+                value
+            )
 
-    from OICFurniture import create_furniture
+        else:
+            kwargs[argument] = (
+                value.Value
+            )
 
     new_furniture = create_furniture(
         document=document,
         position=new_position,
-        width=source_width,
-        depth=source_depth,
-        height=source_height,
-        rotation=rotation,
+        **kwargs,
     )
 
     new_furniture.Label = (
