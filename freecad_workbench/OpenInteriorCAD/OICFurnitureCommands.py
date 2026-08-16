@@ -5,12 +5,16 @@ import FreeCADGui as Gui
 from PySide import QtWidgets
 
 from OICCutListPanel import CutListPanel
+from OICCutLayoutPanel import CutLayoutPanel
 from OICEdgeAssignmentPanel import EdgeAssignmentPanel
+from OICMaterialLibraryPanel import MaterialLibraryPanel
+from OICHardwarePanel import HardwarePanel
 from OICFurniture import create_furniture
 from OICFurnitureDuplicatePanel import (
     FurnitureDuplicatePanel,
 )
 from OICFurnitureEditPanel import FurnitureEditPanel
+from OICFrontOpeningPanel import FrontOpeningPanel
 from OICFurnitureMovePanel import (
     FurnitureMovePanel,
 )
@@ -543,6 +547,111 @@ class DuplicateFurnitureCommand:
         )
 
 
+class FrontOpeningCommand:
+    """Open/close standard hinged cabinet fronts."""
+
+    def GetResources(
+        self,
+    ):
+        return {
+            "MenuText": "Front Opening",
+            "ToolTip": (
+                "Open Single Door and Double Door fronts and control "
+                "their opening angle."
+            ),
+        }
+
+    def IsActive(
+        self,
+    ):
+        return App.ActiveDocument is not None
+
+    def Activated(
+        self,
+    ):
+        stop_active_tools()
+
+        if Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+
+        furniture = get_selected_furniture(
+            "Front Opening"
+        )
+
+        if furniture is None:
+            return
+
+        # Old documents receive the new opening properties on demand.
+        try:
+            furniture.Proxy._add_properties(
+                furniture
+            )
+        except Exception:
+            pass
+
+        panel = FrontOpeningPanel(
+            furniture
+        )
+
+        Gui.Control.showDialog(
+            panel
+        )
+
+
+class MaterialLibraryCommand:
+    """Open persistent material library and assign materials."""
+
+    def GetResources(
+        self,
+    ):
+        return {
+            "MenuText": "Material Library",
+            "ToolTip": (
+                "Manage board, front, back and edge-band materials "
+                "and assign them to the selected cabinet."
+            ),
+        }
+
+    def IsActive(
+        self,
+    ):
+        return True
+
+    def Activated(
+        self,
+    ):
+        stop_active_tools()
+
+        if Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+
+        furniture = None
+
+        selection = Gui.Selection.getSelection()
+
+        if len(
+            selection
+        ) == 1:
+            candidate = selection[
+                0
+            ]
+
+            if getattr(
+                candidate,
+                "OICType",
+                "",
+            ) == "OpenInteriorCAD::Furniture":
+                furniture = candidate
+
+        panel = MaterialLibraryPanel(
+            furniture
+        )
+
+        Gui.Control.showDialog(
+            panel
+        )
+
+
 class EdgeAssignmentCommand:
     """Edit edge-band assignment for selected cabinet."""
 
@@ -588,6 +697,83 @@ class EdgeAssignmentCommand:
         panel = EdgeAssignmentPanel(
             furniture
         )
+
+        Gui.Control.showDialog(
+            panel
+        )
+
+
+class HardwareCommand:
+    """Calculate and edit hardware for the selected cabinet."""
+
+    def GetResources(
+        self,
+    ):
+        return {
+            "MenuText": "Hardware",
+            "ToolTip": (
+                "Calculate hinges, drawer runners, legs, shelf supports, "
+                "lift mechanisms and handles for the selected cabinet."
+            ),
+        }
+
+    def IsActive(
+        self,
+    ):
+        return App.ActiveDocument is not None
+
+    def Activated(
+        self,
+    ):
+        stop_active_tools()
+
+        if Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+
+        furniture = get_selected_furniture(
+            "Hardware"
+        )
+
+        if furniture is None:
+            return
+
+        panel = HardwarePanel(
+            furniture
+        )
+
+        Gui.Control.showDialog(
+            panel
+        )
+
+
+class CutLayoutCommand:
+    """Visualize board parts arranged on stock sheets."""
+
+    def GetResources(
+        self,
+    ):
+        return {
+            "MenuText": "Cut Layout",
+            "ToolTip": (
+                "Visualize board-part cutting layout on full sheets. "
+                "Uses selected cabinets, or all cabinets if none are selected."
+            ),
+        }
+
+    def IsActive(
+        self,
+    ):
+        return App.ActiveDocument is not None
+
+    def Activated(
+        self,
+    ):
+        stop_active_tools()
+
+        if Gui.Control.activeDialog():
+            Gui.Control.closeDialog()
+
+        panel = CutLayoutPanel()
 
         Gui.Control.showDialog(
             panel
@@ -659,8 +845,28 @@ Gui.addCommand(
 )
 
 Gui.addCommand(
+    "OIC_FrontOpening",
+    FrontOpeningCommand(),
+)
+
+Gui.addCommand(
+    "OIC_MaterialLibrary",
+    MaterialLibraryCommand(),
+)
+
+Gui.addCommand(
     "OIC_EdgeAssignment",
     EdgeAssignmentCommand(),
+)
+
+Gui.addCommand(
+    "OIC_Hardware",
+    HardwareCommand(),
+)
+
+Gui.addCommand(
+    "OIC_CutLayout",
+    CutLayoutCommand(),
 )
 
 Gui.addCommand(
