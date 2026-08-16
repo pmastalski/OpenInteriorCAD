@@ -10,6 +10,7 @@ from OICFurniture import (
     CABINET_TALL,
     CABINET_CORNER_BASE,
     CABINET_CORNER_WALL,
+    CABINET_BLIND_CORNER_BASE,
     GEOMETRY_BOX,
     GEOMETRY_CARCASS,
     FRONT_OPEN,
@@ -19,6 +20,7 @@ from OICFurniture import (
     FRONT_DOOR_DRAWERS,
     FRONT_LIFT_UP,
     FRONT_CORNER_FOLDING,
+    ensure_blind_corner_mate,
 )
 
 
@@ -105,6 +107,7 @@ class FurnitureEditPanel:
                 CABINET_TALL,
                 CABINET_CORNER_BASE,
                 CABINET_CORNER_WALL,
+                CABINET_BLIND_CORNER_BASE,
             ]
         )
 
@@ -235,18 +238,6 @@ class FurnitureEditPanel:
             self.depth_b_input,
         )
 
-        self.corner_opening_input = (
-            self._length_spin(
-                50.0,
-                1500.0,
-            )
-        )
-
-        corner_layout.addRow(
-            "Corner Opening:",
-            self.corner_opening_input,
-        )
-
         corner_help = QtWidgets.QLabel(
             "Corner footprint: "
             "A = horizontal leg, "
@@ -263,6 +254,126 @@ class FurnitureEditPanel:
 
         layout.addWidget(
             self.corner_group
+        )
+
+        # BLIND CORNER
+        self.blind_group = (
+            QtWidgets.QGroupBox(
+                "Blind Corner"
+            )
+        )
+
+        blind_layout = (
+            QtWidgets.QFormLayout(
+                self.blind_group
+            )
+        )
+
+        self.blind_side_combo = (
+            QtWidgets.QComboBox()
+        )
+
+        self.blind_side_combo.addItems(
+            [
+                "Left",
+                "Right",
+            ]
+        )
+
+        self.blind_box_width_input = (
+            self._length_spin(
+                100.0,
+                5000.0,
+            )
+        )
+
+        self.blind_filler_width_input = (
+            self._length_spin(
+                0.0,
+                3000.0,
+            )
+        )
+
+        self.blind_door_filler_width_input = (
+            self._length_spin(
+                0.0,
+                1000.0,
+            )
+        )
+
+        self.blind_mate_width_input = (
+            self._length_spin(
+                100.0,
+                5000.0,
+            )
+        )
+
+        self.blind_mate_depth_input = (
+            self._length_spin(
+                100.0,
+                3000.0,
+            )
+        )
+
+        self.ensure_mate_button = (
+            QtWidgets.QPushButton(
+                "Create / Reconnect 90° Cabinet"
+            )
+        )
+
+        blind_layout.addRow(
+            "Hidden Side:",
+            self.blind_side_combo,
+        )
+
+        blind_layout.addRow(
+            "Blind Box Width:",
+            self.blind_box_width_input,
+        )
+
+        blind_layout.addRow(
+            "Corner Spacer Width:",
+            self.blind_filler_width_input,
+        )
+
+        blind_layout.addRow(
+            "Door Clearance Filler:",
+            self.blind_door_filler_width_input,
+        )
+
+        blind_layout.addRow(
+            "90° Cabinet Width:",
+            self.blind_mate_width_input,
+        )
+
+        blind_layout.addRow(
+            "90° Cabinet Depth:",
+            self.blind_mate_depth_input,
+        )
+
+        blind_layout.addRow(
+            self.ensure_mate_button
+        )
+
+        blind_help = QtWidgets.QLabel(
+            "Corner Spacer Width is now the real physical gap between the "
+            "long Blind Corner cabinet and the linked 90° cabinet. "
+            "The long cabinet body/front is automatically shortened by this "
+            "value. Example: Corner Depth 600 mm + Spacer 100 mm gives a "
+            "500 mm deep long cabinet body and a 100 mm spacer before the "
+            "90° cabinet."
+        )
+
+        blind_help.setWordWrap(
+            True
+        )
+
+        blind_layout.addRow(
+            blind_help
+        )
+
+        layout.addWidget(
+            self.blind_group
         )
 
         # CARCASS
@@ -583,6 +694,14 @@ class FurnitureEditPanel:
             self._front_type_changed
         )
 
+        self.blind_side_combo.currentTextChanged.connect(
+            self._blind_side_changed
+        )
+
+        self.ensure_mate_button.clicked.connect(
+            self._ensure_blind_mate
+        )
+
         for widget in (
             self.width_input,
             self.depth_input,
@@ -603,7 +722,11 @@ class FurnitureEditPanel:
             self.front_gap_input,
             self.drawer_count_input,
             self.drawer_zone_height_input,
-            self.corner_opening_input,
+            self.blind_box_width_input,
+            self.blind_filler_width_input,
+            self.blind_door_filler_width_input,
+            self.blind_mate_width_input,
+            self.blind_mate_depth_input,
         ):
             widget.valueChanged.connect(
                 self._values_changed
@@ -655,9 +778,37 @@ class FurnitureEditPanel:
                 self.furniture.DepthB.Value
             )
 
-            self.corner_opening_input.setValue(
-                self.furniture.CornerOpeningWidth.Value
-            )
+            if "BlindSide" in self.furniture.PropertiesList:
+                self.blind_side_combo.setCurrentText(
+                    str(
+                        self.furniture.BlindSide
+                    )
+                )
+
+            if "BlindBoxWidth" in self.furniture.PropertiesList:
+                self.blind_box_width_input.setValue(
+                    self.furniture.BlindBoxWidth.Value
+                )
+
+            if "BlindFillerWidth" in self.furniture.PropertiesList:
+                self.blind_filler_width_input.setValue(
+                    self.furniture.BlindFillerWidth.Value
+                )
+
+            if "BlindDoorFillerWidth" in self.furniture.PropertiesList:
+                self.blind_door_filler_width_input.setValue(
+                    self.furniture.BlindDoorFillerWidth.Value
+                )
+
+            if "BlindMateWidth" in self.furniture.PropertiesList:
+                self.blind_mate_width_input.setValue(
+                    self.furniture.BlindMateWidth.Value
+                )
+
+            if "BlindMateDepth" in self.furniture.PropertiesList:
+                self.blind_mate_depth_input.setValue(
+                    self.furniture.BlindMateDepth.Value
+                )
 
             self.height_input.setValue(
                 self.furniture.Height.Value
@@ -755,12 +906,17 @@ class FurnitureEditPanel:
             }
         )
 
+        is_blind = (
+            cabinet_type
+            == CABINET_BLIND_CORNER_BASE
+        )
+
         self.corner_group.setVisible(
             is_corner
         )
 
-        self.corner_opening_input.setEnabled(
-            is_corner
+        self.blind_group.setVisible(
+            is_blind
         )
 
         self.wall_group.setVisible(
@@ -790,6 +946,15 @@ class FurnitureEditPanel:
 
             self.depth_label.setText(
                 "Depth A:"
+            )
+
+        elif is_blind:
+            self.width_label.setText(
+                "Overall Width:"
+            )
+
+            self.depth_label.setText(
+                "Corner Depth:"
             )
 
         else:
@@ -899,12 +1064,113 @@ class FurnitureEditPanel:
         self._update_front_ui()
         self._values_changed()
 
+    def _blind_side_changed(
+        self,
+        *_args,
+    ):
+        """Mirror and resync the complete two-cabinet set in one operation."""
+
+        if self._updating:
+            return
+
+        self._values_changed()
+
+        if (
+            self.type_combo.currentText()
+            == CABINET_BLIND_CORNER_BASE
+        ):
+            self._ensure_blind_mate()
+
+
+    def _ensure_blind_mate(
+        self,
+        *_args,
+    ):
+        if self._updating:
+            return
+
+        if self.type_combo.currentText() != CABINET_BLIND_CORNER_BASE:
+            return
+
+        # Push the currently displayed dimensions first.
+        try:
+            if "BlindMateWidth" in self.furniture.PropertiesList:
+                self.furniture.BlindMateWidth = (
+                    self.blind_mate_width_input.value()
+                )
+
+            if "BlindMateDepth" in self.furniture.PropertiesList:
+                self.furniture.BlindMateDepth = (
+                    self.blind_mate_depth_input.value()
+                )
+        except Exception:
+            pass
+
+        try:
+            mate = ensure_blind_corner_mate(
+                self.furniture
+            )
+
+            if mate is not None:
+                self.furniture.Document.recompute()
+
+        except Exception as error:
+            QtWidgets.QMessageBox.warning(
+                self.form,
+                "Blind Corner",
+                f"Could not create the 90° cabinet:\\n{error}",
+            )
+
+
     def _type_changed(
         self,
         *args,
     ):
+        if (
+            not self._updating
+            and self.type_combo.currentText()
+            == CABINET_BLIND_CORNER_BASE
+        ):
+            # Switching a standard 600 mm cabinet to Blind Corner would
+            # otherwise be temporarily invalid. Give it useful defaults.
+            if self.width_input.value() < 900.0:
+                self.width_input.setValue(
+                    1200.0
+                )
+
+            if self.blind_box_width_input.value() <= 0.0:
+                self.blind_box_width_input.setValue(
+                    600.0
+                )
+
+            if self.blind_filler_width_input.value() <= 0.0:
+                self.blind_filler_width_input.setValue(
+                    100.0
+                )
+
+            if self.blind_door_filler_width_input.value() <= 0.0:
+                self.blind_door_filler_width_input.setValue(
+                    50.0
+                )
+
+            if self.blind_mate_width_input.value() <= 0.0:
+                self.blind_mate_width_input.setValue(
+                    600.0
+                )
+
+            if self.blind_mate_depth_input.value() <= 0.0:
+                self.blind_mate_depth_input.setValue(
+                    600.0
+                )
+
         self._update_type_ui()
         self._values_changed()
+
+        if (
+            self.type_combo.currentText()
+            == CABINET_BLIND_CORNER_BASE
+        ):
+            self._ensure_blind_mate()
 
     def _values_changed(
         self,
@@ -940,9 +1206,35 @@ class FurnitureEditPanel:
                 self.depth_b_input.value()
             )
 
-            self.furniture.CornerOpeningWidth = (
-                self.corner_opening_input.value()
-            )
+            if "BlindSide" in self.furniture.PropertiesList:
+                self.furniture.BlindSide = (
+                    self.blind_side_combo.currentText()
+                )
+
+            if "BlindBoxWidth" in self.furniture.PropertiesList:
+                self.furniture.BlindBoxWidth = (
+                    self.blind_box_width_input.value()
+                )
+
+            if "BlindFillerWidth" in self.furniture.PropertiesList:
+                self.furniture.BlindFillerWidth = (
+                    self.blind_filler_width_input.value()
+                )
+
+            if "BlindDoorFillerWidth" in self.furniture.PropertiesList:
+                self.furniture.BlindDoorFillerWidth = (
+                    self.blind_door_filler_width_input.value()
+                )
+
+            if "BlindMateWidth" in self.furniture.PropertiesList:
+                self.furniture.BlindMateWidth = (
+                    self.blind_mate_width_input.value()
+                )
+
+            if "BlindMateDepth" in self.furniture.PropertiesList:
+                self.furniture.BlindMateDepth = (
+                    self.blind_mate_depth_input.value()
+                )
 
             self.furniture.Height = (
                 self.height_input.value()

@@ -61,7 +61,19 @@ class OpenInteriorCADWorkbench(
             "OIC_CutList"
             not in commands
             or
+            "OIC_CutLayout"
+            not in commands
+            or
             "OIC_EdgeAssignment"
+            not in commands
+            or
+            "OIC_FrontOpening"
+            not in commands
+            or
+            "OIC_MaterialLibrary"
+            not in commands
+            or
+            "OIC_Hardware"
             not in commands
         ):
             importlib.reload(
@@ -97,10 +109,14 @@ class OpenInteriorCADWorkbench(
             "OIC_SnapFurnitureWall",
             "OIC_SnapFurnitureFurniture",
             "OIC_DuplicateFurniture",
+            "OIC_FrontOpening",
 
             # Production
+            "OIC_MaterialLibrary",
             "OIC_EdgeAssignment",
+            "OIC_Hardware",
             "OIC_CutList",
+            "OIC_CutLayout",
         ]
 
         self.appendToolbar(

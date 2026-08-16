@@ -6,6 +6,7 @@ Cabinet Architecture 0.3:
 - Tall
 - Corner Base
 - Corner Wall
+- Blind Corner Base
 
 All variants remain OpenInteriorCAD::Furniture and preserve the common
 Width / Depth / Height / Position / RotationAngle interface used by
@@ -25,6 +26,7 @@ CABINET_WALL = "Wall"
 CABINET_TALL = "Tall"
 CABINET_CORNER_BASE = "Corner Base"
 CABINET_CORNER_WALL = "Corner Wall"
+CABINET_BLIND_CORNER_BASE = "Blind Corner Base"
 
 GEOMETRY_BOX = "Box"
 GEOMETRY_CARCASS = "Carcass"
@@ -65,6 +67,12 @@ class FurnitureProxy:
         drawer_count=3,
         drawer_zone_height=180.0,
         corner_opening_width=450.0,
+        blind_box_width=600.0,
+        blind_filler_width=100.0,
+        blind_door_filler_width=50.0,
+        blind_mate_width=600.0,
+        blind_mate_depth=600.0,
+        blind_side="Left",
     ):
         self._add_properties(obj)
         obj.Proxy = self
@@ -94,6 +102,12 @@ class FurnitureProxy:
         obj.DrawerCount = int(drawer_count)
         obj.DrawerZoneHeight = drawer_zone_height
         obj.CornerOpeningWidth = corner_opening_width
+        obj.BlindBoxWidth = blind_box_width
+        obj.BlindFillerWidth = blind_filler_width
+        obj.BlindDoorFillerWidth = blind_door_filler_width
+        obj.BlindMateWidth = blind_mate_width
+        obj.BlindMateDepth = blind_mate_depth
+        obj.BlindSide = blind_side
 
         self.rebuild_geometry(obj)
 
@@ -128,6 +142,7 @@ class FurnitureProxy:
                 CABINET_TALL,
                 CABINET_CORNER_BASE,
                 CABINET_CORNER_WALL,
+                CABINET_BLIND_CORNER_BASE,
             ]
 
             obj.CabinetType = allowed
@@ -287,6 +302,91 @@ class FurnitureProxy:
 
         add(
             "App::PropertyEnumeration",
+            "BlindSide",
+            "Blind Corner",
+            "Side occupied by the hidden closed box.",
+        )
+
+        if "BlindSide" in obj.PropertiesList:
+            try:
+                current_blind_side = str(
+                    obj.BlindSide
+                )
+            except Exception:
+                current_blind_side = "Left"
+
+            obj.BlindSide = [
+                "Left",
+                "Right",
+            ]
+
+            if current_blind_side in {
+                "Left",
+                "Right",
+            }:
+                obj.BlindSide = current_blind_side
+            else:
+                obj.BlindSide = "Left"
+
+        add(
+            "App::PropertyLength",
+            "BlindBoxWidth",
+            "Blind Corner",
+            "Width of the hidden closed box section.",
+        )
+
+        add(
+            "App::PropertyLength",
+            "BlindFillerWidth",
+            "Blind Corner",
+            "Perpendicular spacer filler length toward the neighbouring cabinet.",
+        )
+
+        add(
+            "App::PropertyLength",
+            "BlindDoorFillerWidth",
+            "Blind Corner",
+            "Front clearance filler that shortens the usable door/front.",
+        )
+
+        add(
+            "App::PropertyLength",
+            "BlindMateWidth",
+            "Blind Corner",
+            "Width of the automatically inserted perpendicular cabinet.",
+        )
+
+        add(
+            "App::PropertyLength",
+            "BlindMateDepth",
+            "Blind Corner",
+            "Depth of the automatically inserted perpendicular cabinet.",
+        )
+
+        add(
+            "App::PropertyLink",
+            "BlindMate",
+            "Blind Corner",
+            "Automatically linked perpendicular corner cabinet.",
+        )
+
+        if obj.BlindBoxWidth.Value <= 0.0:
+            obj.BlindBoxWidth = 600.0
+
+        if obj.BlindFillerWidth.Value <= 0.0:
+            obj.BlindFillerWidth = 100.0
+
+        if obj.BlindDoorFillerWidth.Value < 0.0:
+            obj.BlindDoorFillerWidth = 0.0
+
+        if obj.BlindMateWidth.Value <= 0.0:
+            obj.BlindMateWidth = 600.0
+
+        if obj.BlindMateDepth.Value <= 0.0:
+            obj.BlindMateDepth = 600.0
+
+        add(
+            "App::PropertyEnumeration",
             "FrontType",
             "Front Layout",
             "Front configuration for standard cabinets.",
@@ -328,6 +428,57 @@ class FurnitureProxy:
             "Front Layout",
             "Reveal/gap around and between fronts.",
         )
+
+        add(
+            "App::PropertyAngle",
+            "FrontOpenAngle",
+            "Front Opening",
+            "Visual opening angle for standard hinged fronts.",
+        )
+
+        add(
+            "App::PropertyEnumeration",
+            "SingleDoorHingeSide",
+            "Front Opening",
+            "Hinge side for a single hinged door.",
+        )
+
+        if "SingleDoorHingeSide" in obj.PropertiesList:
+            try:
+                current_hinge_side = str(
+                    obj.SingleDoorHingeSide
+                )
+            except Exception:
+                current_hinge_side = "Left"
+
+            obj.SingleDoorHingeSide = [
+                "Left",
+                "Right",
+            ]
+
+            if current_hinge_side in {
+                "Left",
+                "Right",
+            }:
+                obj.SingleDoorHingeSide = current_hinge_side
+            else:
+                obj.SingleDoorHingeSide = "Left"
+
+        if obj.FrontOpenAngle.Value < 0.0:
+            obj.FrontOpenAngle = 0.0
+
+        if obj.FrontOpenAngle.Value > 120.0:
+            obj.FrontOpenAngle = 120.0
+
+        add(
+            "App::PropertyLength",
+            "DrawerOpenDistance",
+            "Front Opening",
+            "Visual opening distance for drawer fronts.",
+        )
+
+        if obj.DrawerOpenDistance.Value < 0.0:
+            obj.DrawerOpenDistance = 0.0
 
         add(
             "App::PropertyInteger",
@@ -591,6 +742,428 @@ class FurnitureProxy:
         return Part.makeCompound(
             shapes
         )
+
+    def _make_blind_corner_carcass(
+        self,
+        obj,
+    ):
+        """
+        Straight blind-corner base cabinet.
+
+        The footprint is a normal elongated rectangle, not an L.
+
+        Construction:
+        - continuous outer rectangular carcass,
+        - one internal full-height partition,
+        - hidden section closed at the front with a carcass panel,
+        - usable shelves only in the accessible section,
+        - continuous recessed plinth.
+
+        BlindBoxWidth includes the partition thickness.
+        """
+
+        W = float(
+            obj.Width.Value
+        )
+        D = float(
+            obj.Depth.Value
+        )
+        H = float(
+            obj.Height.Value
+        )
+        T = float(
+            obj.PanelThickness.Value
+        )
+        BT = float(
+            obj.BackThickness.Value
+        )
+        B = float(
+            obj.BlindBoxWidth.Value
+        )
+
+        F = max(
+            0.0,
+            float(
+                obj.BlindFillerWidth.Value
+            ),
+        )
+
+        body_depth = (
+            D
+            - F
+        )
+
+        if min(
+            W,
+            body_depth,
+            H,
+            T,
+            BT,
+            B,
+        ) <= 0.001:
+            return Part.Shape()
+
+        plinth = max(
+            0.0,
+            float(
+                obj.PlinthHeight.Value
+            ),
+        )
+
+        if plinth >= H:
+            return Part.Shape()
+
+        body_h = (
+            H
+            - plinth
+        )
+
+        clear_h = (
+            body_h
+            - 2.0 * T
+        )
+
+        inner_depth = (
+            body_depth
+            - BT
+        )
+
+        main_clear_w = (
+            W
+            - B
+            - T
+        )
+
+        hidden_clear_w = (
+            B
+            - 2.0 * T
+        )
+
+        if min(
+            clear_h,
+            inner_depth,
+            main_clear_w,
+            hidden_clear_w,
+        ) <= 0.001:
+            return Part.Shape()
+
+        blind_side = str(
+            obj.BlindSide
+        )
+
+        shapes = [
+            # Outer left side.
+            Part.makeBox(
+                T,
+                body_depth,
+                body_h,
+                App.Vector(
+                    0.0,
+                    0.0,
+                    plinth,
+                ),
+            ),
+
+            # Outer right side.
+            Part.makeBox(
+                T,
+                body_depth,
+                body_h,
+                App.Vector(
+                    W - T,
+                    0.0,
+                    plinth,
+                ),
+            ),
+
+            # Continuous bottom.
+            Part.makeBox(
+                W - 2.0 * T,
+                inner_depth,
+                T,
+                App.Vector(
+                    T,
+                    BT,
+                    plinth,
+                ),
+            ),
+
+            # Continuous top.
+            Part.makeBox(
+                W - 2.0 * T,
+                inner_depth,
+                T,
+                App.Vector(
+                    T,
+                    BT,
+                    plinth
+                    + body_h
+                    - T,
+                ),
+            ),
+
+            # Continuous back.
+            Part.makeBox(
+                W - 2.0 * T,
+                BT,
+                clear_h,
+                App.Vector(
+                    T,
+                    0.0,
+                    plinth + T,
+                ),
+            ),
+        ]
+
+        z_vertical = (
+            plinth
+            + T
+        )
+
+        if blind_side == "Right":
+            partition_x = (
+                W
+                - B
+            )
+
+            main_x0 = T
+            main_w = (
+                partition_x
+                - T
+            )
+
+            hidden_front_x = (
+                partition_x
+                + T
+            )
+
+        else:
+            partition_x = (
+                B
+                - T
+            )
+
+            main_x0 = B
+            main_w = (
+                W
+                - T
+                - B
+            )
+
+            hidden_front_x = T
+
+        # Partition separates the usable compartment from the hidden box.
+        shapes.append(
+            Part.makeBox(
+                T,
+                inner_depth,
+                clear_h,
+                App.Vector(
+                    partition_x,
+                    BT,
+                    z_vertical,
+                ),
+            )
+        )
+
+        # Hidden section front closure.
+        #
+        # It sits inside the carcass front plane. The decorative spacer
+        # filler is generated separately with the visible fronts.
+        shapes.append(
+            Part.makeBox(
+                hidden_clear_w,
+                T,
+                clear_h,
+                App.Vector(
+                    hidden_front_x,
+                    body_depth - T,
+                    z_vertical,
+                ),
+            )
+        )
+
+        # Shelves exist only in the accessible compartment.
+        shelf_count = max(
+            0,
+            int(
+                obj.ShelfCount
+            ),
+        )
+
+        if (
+            shelf_count > 0
+            and main_w > 0.001
+        ):
+            available = (
+                clear_h
+                - shelf_count * T
+            )
+
+            if available > 0.001:
+                clear_gap = (
+                    available
+                    / float(
+                        shelf_count + 1
+                    )
+                )
+
+                z = (
+                    z_vertical
+                    + clear_gap
+                )
+
+                for _ in range(
+                    shelf_count
+                ):
+                    shapes.append(
+                        Part.makeBox(
+                            main_w,
+                            inner_depth,
+                            T,
+                            App.Vector(
+                                main_x0,
+                                BT,
+                                z,
+                            ),
+                        )
+                    )
+
+                    z += (
+                        T
+                        + clear_gap
+                    )
+
+        # Recessed plinth system.
+        #
+        # The front plinth runs along the full new cabinet.
+        # A perpendicular return closes the bottom at the corner and aligns
+        # with the neighbouring cabinet's recessed plinth line.
+        if plinth > 0.001:
+            setback = max(
+                0.0,
+                float(
+                    obj.PlinthSetback.Value
+                ),
+            )
+
+            filler_run = max(
+                0.0,
+                float(
+                    obj.BlindFillerWidth.Value
+                ),
+            )
+
+            plinth_y = max(
+                0.0,
+                min(
+                    body_depth - T,
+                    body_depth
+                    - setback
+                    - T,
+                ),
+            )
+
+            # Main straight toe-kick.
+            shapes.append(
+                Part.makeBox(
+                    W,
+                    T,
+                    plinth,
+                    App.Vector(
+                        0.0,
+                        plinth_y,
+                        0.0,
+                    ),
+                )
+            )
+
+            # Perpendicular toe-kick return.
+            #
+            # It is calculated from the exact same corner/mate convention
+            # as the linked 90-degree cabinet. This fixes the visibly
+            # mismatched short plinth from 0.4 and makes Left / Right mirror.
+            if filler_run > 0.001:
+                # The perpendicular filler now defines the true gap.
+                # The long cabinet body ends at D - filler_run and the
+                # linked 90° cabinet remains referenced at the original D.
+                corner_line_y = (
+                    D
+                    - filler_run
+                )
+
+                filler_end_y = (
+                    corner_line_y
+                    + filler_run
+                )
+
+                if blind_side == "Right":
+                    boundary_x = (
+                        W
+                        - B
+                    )
+
+                    # +90° mate recessed plinth.
+                    return_x = (
+                        boundary_x
+                        + setback
+                    )
+
+                else:
+                    boundary_x = B
+
+                    # Exact X mirror of the Right case.
+                    return_x = (
+                        boundary_x
+                        - setback
+                        - T
+                    )
+
+                # Parent front plinth starts here.
+                parent_plinth_y = plinth_y
+
+                return_y = min(
+                    parent_plinth_y,
+                    filler_end_y,
+                )
+
+                # Exact butt joint with the linked 90° cabinet plinth.
+                #
+                # STEP analysis showed that the previous "+ T" extension
+                # made the short return enter the mate plinth by exactly
+                # one panel thickness (18 x 18 x PlinthHeight at defaults).
+                #
+                # Stop at the mate-plinth face instead.
+                return_len = abs(
+                    filler_end_y
+                    - parent_plinth_y
+                )
+
+                if return_len > 0.001:
+                    shapes.append(
+                        Part.makeBox(
+                            T,
+                            return_len,
+                            plinth,
+                            App.Vector(
+                                return_x,
+                                return_y,
+                                0.0,
+                            ),
+                        )
+                    )
+
+        valid = [
+            shape
+            for shape in shapes
+            if shape is not None
+            and not shape.isNull()
+        ]
+
+        return Part.makeCompound(
+            valid
+        )
+
 
     def _make_l_plate(
         self,
@@ -1224,6 +1797,7 @@ class FurnitureProxy:
         if cabinet_type in {
             CABINET_BASE,
             CABINET_TALL,
+            CABINET_BLIND_CORNER_BASE,
         }:
             z_start = max(
                 0.0,
@@ -1274,6 +1848,564 @@ class FurnitureProxy:
             ),
         )
 
+    def _make_blind_corner_front_geometry(
+        self,
+        obj,
+    ):
+        """
+        Visible front system for Blind Corner Base.
+
+        The hidden box is closed by the carcass. This method adds:
+        - a decorative spacer filler on the hidden side,
+        - fronts only across the usable compartment.
+
+        Standard Single / Double / Drawers / Door + Drawers / Lift-up
+        configurations are supported.
+        """
+
+        W = float(
+            obj.Width.Value
+        )
+        D = float(
+            obj.Depth.Value
+        )
+        H = float(
+            obj.Height.Value
+        )
+        T = float(
+            obj.PanelThickness.Value
+        )
+        B = float(
+            obj.BlindBoxWidth.Value
+        )
+        F = max(
+            0.0,
+            float(
+                obj.BlindFillerWidth.Value
+            ),
+        )
+
+        C = max(
+            0.0,
+            float(
+                obj.BlindDoorFillerWidth.Value
+            ),
+        )
+
+        front_depth = (
+            D
+            - F
+        )
+
+        if front_depth <= 0.001:
+            return []
+
+        front_t = max(
+            0.001,
+            float(
+                obj.FrontThickness.Value
+            ),
+        )
+
+        gap = max(
+            0.0,
+            float(
+                obj.FrontGap.Value
+            ),
+        )
+
+        plinth = max(
+            0.0,
+            float(
+                obj.PlinthHeight.Value
+            ),
+        )
+
+        setback = max(
+            0.0,
+            float(
+                obj.PlinthSetback.Value
+            ),
+        )
+
+        body_h = max(
+            0.0,
+            H - plinth,
+        )
+
+        front_h = max(
+            0.0,
+            H
+            - plinth
+            - 2.0 * gap,
+        )
+
+        if front_h <= 0.001:
+            return []
+
+        blind_side = str(
+            obj.BlindSide
+        )
+
+        if blind_side == "Right":
+            raw_main_left = T
+            raw_main_right = (
+                W
+                - B
+            )
+
+            # Perpendicular spacer sits on the hidden-box boundary.
+            spacer_x = (
+                W
+                - B
+            )
+
+            # Front clearance filler consumes width from the RIGHT side of
+            # the usable opening, next to the corner.
+            clearance_w = min(
+                C,
+                max(
+                    0.0,
+                    raw_main_right
+                    - raw_main_left
+                    - 2.0 * gap
+                    - 1.0,
+                ),
+            )
+
+            main_left = raw_main_left
+            main_right = (
+                raw_main_right
+                - clearance_w
+            )
+
+            clearance_x = main_right
+
+        else:
+            raw_main_left = B
+            raw_main_right = (
+                W
+                - T
+            )
+
+            # Mirror of the right-side solution.
+            spacer_x = (
+                B
+                - front_t
+            )
+
+            # Front clearance filler consumes width from the LEFT side of
+            # the usable opening, next to the corner.
+            clearance_w = min(
+                C,
+                max(
+                    0.0,
+                    raw_main_right
+                    - raw_main_left
+                    - 2.0 * gap
+                    - 1.0,
+                ),
+            )
+
+            main_left = (
+                raw_main_left
+                + clearance_w
+            )
+
+            main_right = raw_main_right
+
+            clearance_x = raw_main_left
+
+        available_width = (
+            main_right
+            - main_left
+            - 2.0 * gap
+        )
+
+        if available_width <= 0.001:
+            return []
+
+        shapes = []
+
+        # --------------------------------------------------
+        # 1) Perpendicular corner spacer / blenda dystansowa
+        # --------------------------------------------------
+        #
+        # Height = cabinet height WITHOUT plinth.
+        # Bottom = top of plinth.
+        #
+        # It is recessed by PlinthSetback so its corner line matches the
+        # neighbouring cabinet's recessed toe-kick/plinth position.
+        if (
+            F > 0.001
+            and body_h > 0.001
+        ):
+            # The perpendicular Corner Spacer is now the PHYSICAL distance
+            # between the shortened long cabinet and the 90-degree cabinet.
+            #
+            # Long cabinet front/body: Y = D - F
+            # 90-degree cabinet corner line: Y = D
+            # Spacer: exactly fills Y = D-F ... D.
+            spacer_y = front_depth
+
+            filler = Part.makeBox(
+                front_t,
+                F,
+                body_h,
+                App.Vector(
+                    spacer_x,
+                    spacer_y,
+                    plinth,
+                ),
+            )
+
+            shapes.append(
+                filler
+            )
+
+        # --------------------------------------------------
+        # 2) Front clearance filler / blenda pod zawias
+        # --------------------------------------------------
+        #
+        # This is a second independently adjustable filler in the cabinet
+        # front plane. It shortens the doors/drawers so they have clearance
+        # from the 90-degree neighbouring cabinet.
+        if (
+            clearance_w > 0.001
+            and body_h > 0.001
+        ):
+            clearance_filler = Part.makeBox(
+                clearance_w,
+                front_t,
+                body_h,
+                App.Vector(
+                    clearance_x,
+                    front_depth,
+                    plinth,
+                ),
+            )
+
+            shapes.append(
+                clearance_filler
+            )
+
+        front_type = str(
+            obj.FrontType
+        )
+
+        if front_type == FRONT_OPEN:
+            return shapes
+
+        try:
+            open_angle = max(
+                0.0,
+                min(
+                    120.0,
+                    float(
+                        obj.FrontOpenAngle.Value
+                    ),
+                ),
+            )
+        except Exception:
+            open_angle = 0.0
+
+        try:
+            drawer_open_distance = max(
+                0.0,
+                float(
+                    obj.DrawerOpenDistance.Value
+                ),
+            )
+        except Exception:
+            drawer_open_distance = 0.0
+
+        z_start = (
+            plinth
+            + gap
+        )
+
+        closed_x = (
+            main_left
+            + gap
+        )
+
+        left_hinge_x = main_left
+        right_hinge_x = main_right
+        hinge_y = front_depth
+
+        is_open_preview = (
+            abs(
+                open_angle
+            )
+            > 0.0001
+        )
+
+        if front_type == FRONT_SINGLE:
+            hinge_side = str(
+                getattr(
+                    obj,
+                    "SingleDoorHingeSide",
+                    "Left",
+                )
+            )
+
+            if hinge_side == "Right":
+                panel_x = (
+                    right_hinge_x
+                    - available_width
+                    if is_open_preview
+                    else closed_x
+                )
+            else:
+                panel_x = (
+                    left_hinge_x
+                    if is_open_preview
+                    else closed_x
+                )
+
+            panel = self._make_front_panel(
+                panel_x,
+                z_start,
+                available_width,
+                front_h,
+                front_depth,
+                front_t,
+            )
+
+            if panel is not None:
+                if hinge_side == "Right":
+                    panel = self._rotate_front_leaf(
+                        panel,
+                        right_hinge_x,
+                        hinge_y,
+                        -open_angle,
+                    )
+                else:
+                    panel = self._rotate_front_leaf(
+                        panel,
+                        left_hinge_x,
+                        hinge_y,
+                        open_angle,
+                    )
+
+                shapes.append(
+                    panel
+                )
+
+        elif front_type == FRONT_DOUBLE:
+            leaf_w = (
+                available_width
+                - gap
+            ) / 2.0
+
+            if leaf_w > 0.001:
+                if is_open_preview:
+                    left_x = left_hinge_x
+                    right_x = (
+                        right_hinge_x
+                        - leaf_w
+                    )
+                else:
+                    left_x = closed_x
+                    right_x = (
+                        closed_x
+                        + leaf_w
+                        + gap
+                    )
+
+                left = self._make_front_panel(
+                    left_x,
+                    z_start,
+                    leaf_w,
+                    front_h,
+                    front_depth,
+                    front_t,
+                )
+
+                right = self._make_front_panel(
+                    right_x,
+                    z_start,
+                    leaf_w,
+                    front_h,
+                    front_depth,
+                    front_t,
+                )
+
+                if left is not None:
+                    left = self._rotate_front_leaf(
+                        left,
+                        left_hinge_x,
+                        hinge_y,
+                        open_angle,
+                    )
+                    shapes.append(
+                        left
+                    )
+
+                if right is not None:
+                    right = self._rotate_front_leaf(
+                        right,
+                        right_hinge_x,
+                        hinge_y,
+                        -open_angle,
+                    )
+                    shapes.append(
+                        right
+                    )
+
+        elif front_type == FRONT_DRAWERS:
+            count = max(
+                1,
+                int(
+                    obj.DrawerCount
+                ),
+            )
+
+            drawer_h = (
+                front_h
+                - gap
+                * (
+                    count - 1
+                )
+            ) / count
+
+            if drawer_h > 0.001:
+                z = z_start
+
+                for _ in range(
+                    count
+                ):
+                    panel = self._make_front_panel(
+                        closed_x,
+                        z,
+                        available_width,
+                        drawer_h,
+                        front_depth
+                        + drawer_open_distance,
+                        front_t,
+                    )
+
+                    if panel is not None:
+                        shapes.append(
+                            panel
+                        )
+
+                    z += (
+                        drawer_h
+                        + gap
+                    )
+
+        elif front_type == FRONT_DOOR_DRAWERS:
+            requested_drawer_h = max(
+                0.0,
+                float(
+                    obj.DrawerZoneHeight.Value
+                ),
+            )
+
+            drawer_h = min(
+                requested_drawer_h,
+                max(
+                    0.0,
+                    front_h - gap,
+                ),
+            )
+
+            door_h = (
+                front_h
+                - drawer_h
+                - gap
+            )
+
+            if drawer_h > 0.001:
+                drawer = self._make_front_panel(
+                    closed_x,
+                    z_start,
+                    available_width,
+                    drawer_h,
+                    front_depth
+                    + drawer_open_distance,
+                    front_t,
+                )
+
+                if drawer is not None:
+                    shapes.append(
+                        drawer
+                    )
+
+            if door_h > 0.001:
+                door = self._make_front_panel(
+                    closed_x,
+                    z_start
+                    + drawer_h
+                    + gap,
+                    available_width,
+                    door_h,
+                    front_depth,
+                    front_t,
+                )
+
+                if door is not None:
+                    shapes.append(
+                        door
+                    )
+
+        elif front_type == FRONT_LIFT_UP:
+            panel = self._make_front_panel(
+                closed_x,
+                z_start,
+                available_width,
+                front_h,
+                front_depth,
+                front_t,
+            )
+
+            if panel is not None:
+                shapes.append(
+                    panel
+                )
+
+        return shapes
+
+
+    def _rotate_point_around_z(
+        self,
+        point,
+        pivot,
+        angle,
+    ):
+        """Return a point rotated around a local vertical Z axis."""
+
+        try:
+            rotation = App.Rotation(
+                App.Vector(
+                    0.0,
+                    0.0,
+                    1.0,
+                ),
+                float(
+                    angle
+                ),
+            )
+
+            relative = (
+                point
+                - pivot
+            )
+
+            rotated = rotation.multVec(
+                relative
+            )
+
+            return (
+                pivot
+                + rotated
+            )
+
+        except Exception:
+            return point
+
+
     def _make_corner_front_geometry(self, obj):
         """
         Corner Generator 1.7 — Full Edge Fronts + Hinge Clearance
@@ -1320,6 +2452,19 @@ class FurnitureProxy:
                     obj.FrontGap.Value
                 ),
             )
+
+            try:
+                open_angle = max(
+                    0.0,
+                    min(
+                        90.0,
+                        float(
+                            obj.FrontOpenAngle.Value
+                        ),
+                    ),
+                )
+            except Exception:
+                open_angle = 0.0
 
         except Exception:
             return []
@@ -1416,10 +2561,143 @@ class FurnitureProxy:
             ),
         )
 
+        # --------------------------------------------------
+        # CORNER FOLDING OPENING
+        # --------------------------------------------------
+        #
+        # At 0° nothing is transformed: this preserves the accepted
+        # Corner Generator 1.7 closed geometry exactly.
+        #
+        # Opening model:
+        # 1. Leaf A is hinged at its OUTER A edge.
+        # 2. Leaf B follows Leaf A around that cabinet hinge.
+        # 3. Leaf B then folds around the moving A/B joint.
+        #
+        # At 90° the two leaves become approximately parallel/folded
+        # together outside the cabinet opening.
+
+        if open_angle > 0.0001:
+            outer_hinge = App.Vector(
+                W - gap,
+                DA,
+                0.0,
+            )
+
+            joint_closed = App.Vector(
+                DB,
+                DA + front_t,
+                0.0,
+            )
+
+            # The room/opening lies in the re-entrant corner. Rotating A
+            # clockwise around its outer hinge moves it out of the cabinet.
+            cabinet_rotation = -open_angle
+
+            leaf_a.rotate(
+                outer_hinge,
+                App.Vector(
+                    0.0,
+                    0.0,
+                    1.0,
+                ),
+                cabinet_rotation,
+            )
+
+            # Leaf B first follows the whole folding pair.
+            leaf_b.rotate(
+                outer_hinge,
+                App.Vector(
+                    0.0,
+                    0.0,
+                    1.0,
+                ),
+                cabinet_rotation,
+            )
+
+            # Find the joint after the first rotation.
+            joint_open = self._rotate_point_around_z(
+                joint_closed,
+                outer_hinge,
+                cabinet_rotation,
+            )
+
+            # Then fold B onto A around the moving joint.
+            leaf_b.rotate(
+                joint_open,
+                App.Vector(
+                    0.0,
+                    0.0,
+                    1.0,
+                ),
+                -open_angle,
+            )
+
         return [
             leaf_a,
             leaf_b,
         ]
+
+
+    def _rotate_front_leaf(
+        self,
+        shape,
+        hinge_x,
+        hinge_y,
+        angle,
+    ):
+        """
+        Rotate one standard front leaf around a local vertical hinge axis.
+
+        Standard front-opening convention in OpenInteriorCAD:
+        the leaf swings outward from the cabinet opening.
+
+        The caller supplies a hinge axis located at the cabinet clear-opening
+        boundary and on the cabinet front plane. When FrontOpenAngle is greater
+        than zero, the leaf is rebuilt from that hinge line before rotation.
+        This prevents the opened leaf from entering the cabinet interior while
+        preserving the original closed overlay-front geometry at 0 degrees.
+
+        Left-hinged leaf uses a positive Z rotation.
+        Right-hinged leaf uses a negative Z rotation.
+        """
+
+        if shape is None:
+            return None
+
+        try:
+            angle = float(
+                angle
+            )
+        except Exception:
+            angle = 0.0
+
+        if abs(
+            angle
+        ) <= 0.0001:
+            return shape
+
+        try:
+            shape.rotate(
+                App.Vector(
+                    float(
+                        hinge_x
+                    ),
+                    float(
+                        hinge_y
+                    ),
+                    0.0,
+                ),
+                App.Vector(
+                    0.0,
+                    0.0,
+                    1.0,
+                ),
+                angle,
+            )
+        except Exception:
+            return shape
+
+        return shape
 
 
     def _make_front_geometry(
@@ -1437,13 +2715,20 @@ class FurnitureProxy:
             obj.FrontType
         )
 
-        if str(
+        cabinet_type = str(
             obj.CabinetType
-        ) in {
+        )
+
+        if cabinet_type in {
             CABINET_CORNER_BASE,
             CABINET_CORNER_WALL,
         }:
             return self._make_corner_front_geometry(
+                obj
+            )
+
+        if cabinet_type == CABINET_BLIND_CORNER_BASE:
+            return self._make_blind_corner_front_geometry(
                 obj
             )
 
@@ -1467,6 +2752,29 @@ class FurnitureProxy:
             obj.FrontGap.Value,
         )
 
+        try:
+            open_angle = max(
+                0.0,
+                min(
+                    120.0,
+                    float(
+                        obj.FrontOpenAngle.Value
+                    ),
+                ),
+            )
+        except Exception:
+            open_angle = 0.0
+
+        try:
+            drawer_open_distance = max(
+                0.0,
+                float(
+                    obj.DrawerOpenDistance.Value
+                ),
+            )
+        except Exception:
+            drawer_open_distance = 0.0
+
         available_width = (
             width
             - 2.0 * gap
@@ -1484,11 +2792,73 @@ class FurnitureProxy:
             return []
 
         y_depth = depth
+
+        # Concealed-hinge visual pivot.
+        #
+        # The clear cabinet opening begins at the inner face of each side:
+        #   left  = PanelThickness
+        #   right = Width - PanelThickness
+        #
+        # The hinge axis is also moved to the OUTER face of the front
+        # (Depth + FrontThickness). Rotating around the old axis at the
+        # rear face of the front caused the door thickness itself to swing
+        # beyond the cabinet side.
+        panel_t = max(
+            0.0,
+            float(
+                obj.PanelThickness.Value
+            ),
+        )
+
+        # Hinge axis lies on the cabinet front plane.
+        # The opened leaf is rebuilt from the clear-opening hinge line,
+        # so it swings outward without moving into the cabinet interior.
+        hinge_y = y_depth
+
+        left_hinge_x = max(
+            gap,
+            panel_t,
+        )
+
+        right_hinge_x = min(
+            width - gap,
+            width - panel_t,
+        )
+
+        is_open_preview = (
+            abs(
+                open_angle
+            )
+            > 0.0001
+        )
+
         shapes = []
 
         if front_type == FRONT_SINGLE:
+            hinge_side = str(
+                getattr(
+                    obj,
+                    "SingleDoorHingeSide",
+                    "Left",
+                )
+            )
+
+            if hinge_side == "Right":
+                panel_x = (
+                    right_hinge_x
+                    - available_width
+                    if is_open_preview
+                    else gap
+                )
+            else:
+                panel_x = (
+                    left_hinge_x
+                    if is_open_preview
+                    else gap
+                )
+
             panel = self._make_front_panel(
-                gap,
+                panel_x,
                 z_start + gap,
                 available_width,
                 available_height,
@@ -1497,6 +2867,21 @@ class FurnitureProxy:
             )
 
             if panel is not None:
+                if hinge_side == "Right":
+                    panel = self._rotate_front_leaf(
+                        panel,
+                        right_hinge_x,
+                        hinge_y,
+                        -open_angle,
+                    )
+                else:
+                    panel = self._rotate_front_leaf(
+                        panel,
+                        left_hinge_x,
+                        hinge_y,
+                        open_angle,
+                    )
+
                 shapes.append(
                     panel
                 )
@@ -1508,8 +2893,22 @@ class FurnitureProxy:
             ) / 2.0
 
             if leaf_width > 0.001:
+                if is_open_preview:
+                    left_x = left_hinge_x
+                    right_x = (
+                        right_hinge_x
+                        - leaf_width
+                    )
+                else:
+                    left_x = gap
+                    right_x = (
+                        gap
+                        + leaf_width
+                        + gap
+                    )
+
                 left = self._make_front_panel(
-                    gap,
+                    left_x,
                     z_start + gap,
                     leaf_width,
                     available_height,
@@ -1518,9 +2917,7 @@ class FurnitureProxy:
                 )
 
                 right = self._make_front_panel(
-                    gap
-                    + leaf_width
-                    + gap,
+                    right_x,
                     z_start + gap,
                     leaf_width,
                     available_height,
@@ -1529,11 +2926,25 @@ class FurnitureProxy:
                 )
 
                 if left is not None:
+                    left = self._rotate_front_leaf(
+                        left,
+                        left_hinge_x,
+                        hinge_y,
+                        open_angle,
+                    )
+
                     shapes.append(
                         left
                     )
 
                 if right is not None:
+                    right = self._rotate_front_leaf(
+                        right,
+                        right_hinge_x,
+                        hinge_y,
+                        -open_angle,
+                    )
+
                     shapes.append(
                         right
                     )
@@ -1569,7 +2980,8 @@ class FurnitureProxy:
                         z,
                         available_width,
                         drawer_height,
-                        y_depth,
+                        y_depth
+                        + drawer_open_distance,
                         thickness,
                     )
 
@@ -1611,7 +3023,8 @@ class FurnitureProxy:
                     + gap,
                     available_width,
                     drawer_zone,
-                    y_depth,
+                    y_depth
+                    + drawer_open_distance,
                     thickness,
                 )
 
@@ -1682,6 +3095,11 @@ class FurnitureProxy:
             return self._make_corner_carcass(
                 obj,
                 use_plinth=False,
+            )
+
+        if cabinet_type == CABINET_BLIND_CORNER_BASE:
+            return self._make_blind_corner_carcass(
+                obj
             )
 
         return self._make_standard_carcass(
@@ -1922,6 +3340,296 @@ class FurnitureProxy:
         return True
 
 
+    def _blind_corner_dimensions_ready(
+        self,
+        obj,
+    ):
+        """Validate Blind Corner Base dimensions during live editing."""
+
+        try:
+            if str(
+                obj.CabinetType
+            ) != CABINET_BLIND_CORNER_BASE:
+                return True
+
+            W = float(
+                obj.Width.Value
+            )
+            D = float(
+                obj.Depth.Value
+            )
+            H = float(
+                obj.Height.Value
+            )
+            T = float(
+                obj.PanelThickness.Value
+            )
+            BT = float(
+                obj.BackThickness.Value
+            )
+            B = float(
+                obj.BlindBoxWidth.Value
+            )
+            F = float(
+                obj.BlindFillerWidth.Value
+            )
+            C = float(
+                obj.BlindDoorFillerWidth.Value
+            )
+            MW = float(
+                obj.BlindMateWidth.Value
+            )
+            MD = float(
+                obj.BlindMateDepth.Value
+            )
+
+        except Exception:
+            return False
+
+        eps = 0.01
+
+        if min(
+            W,
+            D,
+            H,
+            T,
+            BT,
+            B,
+        ) <= eps:
+            return False
+
+        body_depth = (
+            D - F
+        )
+
+        if body_depth <= BT + T + 100.0:
+            return False
+
+        # Hidden box needs two panel thicknesses and useful internal volume.
+        if B <= 2.0 * T + 50.0:
+            return False
+
+        # Accessible compartment must retain useful clear width.
+        if W - B - T <= 100.0:
+            return False
+
+        if F < 0.0:
+            return False
+
+        if C < 0.0:
+            return False
+
+        # The clearance filler must leave a usable front opening.
+        if C >= W - B - T - 2.0:
+            return False
+
+        if MW <= 50.0:
+            return False
+
+        if MD <= 50.0:
+            return False
+
+        return True
+
+
+    def _blind_mate_local_placement(
+        self,
+        obj,
+    ):
+        """
+        Return mate origin/rotation in the parent cabinet LOCAL coordinate system.
+
+        The perpendicular cabinet begins exactly after the adjustable corner
+        spacer. Hidden Side mirrors the complete corner arrangement.
+        """
+
+        W = float(
+            obj.Width.Value
+        )
+        D = float(
+            obj.Depth.Value
+        )
+        B = float(
+            obj.BlindBoxWidth.Value
+        )
+        F = max(
+            0.0,
+            float(
+                obj.BlindFillerWidth.Value
+            ),
+        )
+        setback = max(
+            0.0,
+            float(
+                obj.PlinthSetback.Value
+            ),
+        )
+        mate_depth = float(
+            obj.BlindMateDepth.Value
+        )
+
+        # The 90° cabinet remains on the original outer corner line.
+        # The long Blind Corner cabinet is shortened by F, so the Corner
+        # Spacer occupies the exact gap between D-F and D.
+        corner_line_y = D
+
+        blind_side = str(
+            obj.BlindSide
+        )
+
+        filler_end_y = corner_line_y
+
+        mate_width = float(
+            obj.BlindMateWidth.Value
+        )
+
+        if blind_side == "Left":
+            # Hidden box / return cabinet on the LEFT.
+            #
+            # Rotation -90° maps the mate local +X (its Width) toward -Y.
+            # Therefore its origin must be placed at the FAR Y end so the
+            # complete cabinet spans:
+            #
+            #   Y = filler_end_y ... filler_end_y + mate_width
+            #
+            # exactly like the Right variant, but mirrored in X.
+            boundary_x = B
+
+            local_position = App.Vector(
+                boundary_x
+                - mate_depth,
+                filler_end_y
+                + mate_width,
+                0.0,
+            )
+
+            relative_rotation = -90.0
+
+        else:
+            # Hidden box / return cabinet on the RIGHT.
+            # Rotation +90° maps mate Width toward +Y.
+            boundary_x = (
+                W
+                - B
+            )
+
+            local_position = App.Vector(
+                boundary_x
+                + mate_depth,
+                filler_end_y,
+                0.0,
+            )
+
+            relative_rotation = 90.0
+
+        return (
+            local_position,
+            relative_rotation,
+        )
+
+    def _local_point_to_world(
+        self,
+        obj,
+        point,
+    ):
+        """Transform a local parent-cabinet point into document coordinates."""
+
+        rotation = App.Rotation(
+            App.Vector(
+                0.0,
+                0.0,
+                1.0,
+            ),
+            float(
+                obj.RotationAngle.Value
+            ),
+        )
+
+        rotated = rotation.multVec(
+            point
+        )
+
+        return App.Vector(
+            obj.Position.x + rotated.x,
+            obj.Position.y + rotated.y,
+            obj.Position.z + rotated.z,
+        )
+
+    def _sync_blind_corner_mate(
+        self,
+        obj,
+    ):
+        """Keep an existing linked perpendicular cabinet aligned."""
+
+        if str(
+            obj.CabinetType
+        ) != CABINET_BLIND_CORNER_BASE:
+            return
+
+        try:
+            mate = obj.BlindMate
+        except Exception:
+            mate = None
+
+        if mate is None:
+            return
+
+        try:
+            if mate.Document is None:
+                return
+        except Exception:
+            return
+
+        local_position, relative_rotation = (
+            self._blind_mate_local_placement(
+                obj
+            )
+        )
+
+        world_position = (
+            self._local_point_to_world(
+                obj,
+                local_position,
+            )
+        )
+
+        try:
+            mate.Position = world_position
+            mate.RotationAngle = (
+                float(
+                    obj.RotationAngle.Value
+                )
+                + relative_rotation
+            )
+
+            mate.Width = float(
+                obj.BlindMateWidth.Value
+            )
+            mate.Depth = float(
+                obj.BlindMateDepth.Value
+            )
+            mate.Height = float(
+                obj.Height.Value
+            )
+
+            # Keep construction levels aligned across the corner.
+            mate.PanelThickness = float(
+                obj.PanelThickness.Value
+            )
+            mate.BackThickness = float(
+                obj.BackThickness.Value
+            )
+            mate.PlinthHeight = float(
+                obj.PlinthHeight.Value
+            )
+            mate.PlinthSetback = float(
+                obj.PlinthSetback.Value
+            )
+
+        except Exception:
+            return
+
+
     def rebuild_geometry(
         self,
         obj,
@@ -1929,6 +3637,11 @@ class FurnitureProxy:
         # Width A / Width B fields emit intermediate values while typing.
         # Keep the last valid Shape until the final valid value is entered.
         if not self._corner_dimensions_ready(
+            obj
+        ):
+            return
+
+        if not self._blind_corner_dimensions_ready(
             obj
         ):
             return
@@ -1995,6 +3708,13 @@ class FurnitureProxy:
 
         obj.Shape = shape
 
+        if str(
+            obj.CabinetType
+        ) == CABINET_BLIND_CORNER_BASE:
+            self._sync_blind_corner_mate(
+                obj
+            )
+
     def execute(
         self,
         obj,
@@ -2026,9 +3746,18 @@ class FurnitureProxy:
             "FrontType",
             "FrontThickness",
             "FrontGap",
+            "FrontOpenAngle",
+            "SingleDoorHingeSide",
+            "DrawerOpenDistance",
             "DrawerCount",
             "DrawerZoneHeight",
             "CornerOpeningWidth",
+            "BlindSide",
+            "BlindBoxWidth",
+            "BlindFillerWidth",
+            "BlindDoorFillerWidth",
+            "BlindMateWidth",
+            "BlindMateDepth",
         }
 
         if property_name not in watched:
@@ -2053,8 +3782,18 @@ class FurnitureProxy:
             "FrontType",
             "FrontThickness",
             "FrontGap",
+            "FrontOpenAngle",
+            "SingleDoorHingeSide",
+            "DrawerOpenDistance",
             "DrawerCount",
             "DrawerZoneHeight",
+            "BlindSide",
+            "BlindBoxWidth",
+            "BlindFillerWidth",
+            "BlindDoorFillerWidth",
+            "BlindMateWidth",
+            "BlindMateDepth",
+            "BlindMate",
         }
 
         if not required.issubset(
@@ -2065,6 +3804,11 @@ class FurnitureProxy:
             return
 
         if not self._corner_dimensions_ready(
+            obj
+        ):
+            return
+
+        if not self._blind_corner_dimensions_ready(
             obj
         ):
             return
@@ -2155,6 +3899,131 @@ class FurnitureViewProvider:
         return None
 
 
+def ensure_blind_corner_mate(
+    parent,
+):
+    """
+    Create the perpendicular standard Base cabinet if it does not exist.
+
+    The two cabinets remain separate Furniture objects so the companion can
+    still receive its own fronts, shelves, materials and production data.
+    Its position/dimensions are driven by the Blind Corner parent.
+    """
+
+    if parent is None:
+        return None
+
+    if str(
+        getattr(
+            parent,
+            "CabinetType",
+            "",
+        )
+    ) != CABINET_BLIND_CORNER_BASE:
+        return None
+
+    document = parent.Document
+
+    if document is None:
+        return None
+
+    try:
+        mate = parent.BlindMate
+    except Exception:
+        mate = None
+
+    if mate is not None:
+        try:
+            if mate.Document is document:
+                parent.Proxy._sync_blind_corner_mate(
+                    parent
+                )
+                return mate
+        except Exception:
+            pass
+
+    local_position, relative_rotation = (
+        parent.Proxy._blind_mate_local_placement(
+            parent
+        )
+    )
+
+    world_position = (
+        parent.Proxy._local_point_to_world(
+            parent,
+            local_position,
+        )
+    )
+
+    mate = create_furniture(
+        document=document,
+        position=world_position,
+        width=float(
+            parent.BlindMateWidth.Value
+        ),
+        depth=float(
+            parent.BlindMateDepth.Value
+        ),
+        height=float(
+            parent.Height.Value
+        ),
+        rotation=(
+            float(
+                parent.RotationAngle.Value
+            )
+            + relative_rotation
+        ),
+        name="CornerMate",
+        cabinet_type=CABINET_BASE,
+        geometry_mode=str(
+            parent.GeometryMode
+        ),
+        panel_thickness=float(
+            parent.PanelThickness.Value
+        ),
+        back_thickness=float(
+            parent.BackThickness.Value
+        ),
+        shelf_count=int(
+            parent.ShelfCount
+        ),
+        plinth_height=float(
+            parent.PlinthHeight.Value
+        ),
+        plinth_setback=float(
+            parent.PlinthSetback.Value
+        ),
+        front_type=FRONT_OPEN,
+        front_thickness=float(
+            parent.FrontThickness.Value
+        ),
+        front_gap=float(
+            parent.FrontGap.Value
+        ),
+    )
+
+    mate.Label = "Corner Mate"
+
+    if "CornerParent" not in mate.PropertiesList:
+        mate.addProperty(
+            "App::PropertyLink",
+            "CornerParent",
+            "Blind Corner",
+            "Parent Blind Corner Base cabinet.",
+        )
+
+    mate.CornerParent = parent
+    parent.BlindMate = mate
+
+    parent.Proxy._sync_blind_corner_mate(
+        parent
+    )
+
+    document.recompute()
+
+    return mate
+
+
 def create_furniture(
     document,
     position,
@@ -2179,6 +4048,12 @@ def create_furniture(
     drawer_count=3,
     drawer_zone_height=180.0,
     corner_opening_width=450.0,
+    blind_box_width=600.0,
+    blind_filler_width=100.0,
+    blind_door_filler_width=50.0,
+    blind_mate_width=600.0,
+    blind_mate_depth=600.0,
+    blind_side="Left",
 ):
     """Create one universal Cabinet object."""
 
@@ -2212,6 +4087,12 @@ def create_furniture(
         drawer_count=drawer_count,
         drawer_zone_height=drawer_zone_height,
         corner_opening_width=corner_opening_width,
+        blind_box_width=blind_box_width,
+        blind_filler_width=blind_filler_width,
+        blind_door_filler_width=blind_door_filler_width,
+        blind_mate_width=blind_mate_width,
+        blind_mate_depth=blind_mate_depth,
+        blind_side=blind_side,
     )
 
     FurnitureViewProvider(
@@ -2231,5 +4112,16 @@ def create_furniture(
         pass
 
     obj.ViewObject.Visibility = True
+
+    if cabinet_type == CABINET_BLIND_CORNER_BASE:
+        try:
+            ensure_blind_corner_mate(
+                obj
+            )
+        except Exception as error:
+            App.Console.PrintError(
+                "OpenInteriorCAD corner mate creation error: "
+                f"{error}\n"
+            )
 
     return obj

@@ -477,6 +477,535 @@ def _standard_parts(obj):
     return parts
 
 
+def _blind_corner_parts(obj):
+    """Production parts for the straight Blind Corner Base cabinet."""
+
+    W = _mm(
+        obj.Width
+    )
+    D = _mm(
+        obj.Depth
+    )
+    H = _mm(
+        obj.Height
+    )
+    T = _mm(
+        obj.PanelThickness
+    )
+    BT = _mm(
+        obj.BackThickness
+    )
+    B = _mm(
+        obj.BlindBoxWidth
+    )
+    F = _mm(
+        obj.BlindFillerWidth
+    )
+
+    C = _mm(
+        obj.BlindDoorFillerWidth
+    )
+
+    body_depth = max(
+        0.0,
+        D - F,
+    )
+
+    materials = _production_materials(
+        obj
+    )
+
+    board = materials["board"]
+    back = materials["back"]
+    front_material = materials["front"]
+    edge = materials["edge"]
+    edge_t = materials["edge_thickness"]
+
+    plinth = _mm(
+        obj.PlinthHeight
+    )
+
+    setback = _mm(
+        obj.PlinthSetback
+    )
+
+    body_h = max(
+        0.0,
+        H - plinth,
+    )
+
+    clear_h = max(
+        0.0,
+        body_h - 2.0 * T,
+    )
+
+    inner_depth = max(
+        0.0,
+        body_depth - BT,
+    )
+
+    hidden_clear_w = max(
+        0.0,
+        B - 2.0 * T,
+    )
+
+    main_clear_w = max(
+        0.0,
+        W - B - T,
+    )
+
+    parts = [
+        _part(
+            "Left Side",
+            "Side",
+            body_h,
+            body_depth,
+            T,
+            board,
+            edge_material=edge,
+            edge_thickness=edge_t,
+            edge_length=body_h,
+            edge_count=1,
+            edge_front=True,
+        ),
+        _part(
+            "Right Side",
+            "Side",
+            body_h,
+            body_depth,
+            T,
+            board,
+            edge_material=edge,
+            edge_thickness=edge_t,
+            edge_length=body_h,
+            edge_count=1,
+            edge_front=True,
+        ),
+        _part(
+            "Bottom",
+            "Bottom",
+            max(
+                0.0,
+                W - 2.0 * T,
+            ),
+            inner_depth,
+            T,
+            board,
+            edge_material=edge,
+            edge_thickness=edge_t,
+            edge_length=max(
+                0.0,
+                W - 2.0 * T,
+            ),
+            edge_count=1,
+            edge_front=True,
+        ),
+        _part(
+            "Top",
+            "Top",
+            max(
+                0.0,
+                W - 2.0 * T,
+            ),
+            inner_depth,
+            T,
+            board,
+            edge_material=edge,
+            edge_thickness=edge_t,
+            edge_length=max(
+                0.0,
+                W - 2.0 * T,
+            ),
+            edge_count=1,
+            edge_front=True,
+        ),
+        _part(
+            "Back",
+            "Back",
+            max(
+                0.0,
+                W - 2.0 * T,
+            ),
+            clear_h,
+            BT,
+            back,
+        ),
+        _part(
+            "Partition Side",
+            "Side",
+            clear_h,
+            inner_depth,
+            T,
+            board,
+            edge_material=edge,
+            edge_thickness=edge_t,
+            edge_length=clear_h,
+            edge_count=1,
+            edge_front=True,
+        ),
+        _part(
+            "Blind Closure",
+            "Blind Box",
+            hidden_clear_w,
+            clear_h,
+            T,
+            board,
+        ),
+    ]
+
+    shelf_count = max(
+        0,
+        int(
+            getattr(
+                obj,
+                "ShelfCount",
+                0,
+            )
+        ),
+    )
+
+    if shelf_count:
+        parts.append(
+            _part(
+                "Shelf",
+                "Shelf",
+                main_clear_w,
+                inner_depth,
+                T,
+                board,
+                quantity=shelf_count,
+                edge_material=edge,
+                edge_thickness=edge_t,
+                edge_length=main_clear_w,
+                edge_count=1,
+                edge_front=True,
+            )
+        )
+
+    if plinth > 0.0:
+        parts.append(
+            _part(
+                "Plinth",
+                "Plinth",
+                W,
+                plinth,
+                T,
+                board,
+                edge_material=edge,
+                edge_thickness=edge_t,
+                edge_length=W,
+                edge_count=1,
+                edge_front=True,
+            )
+        )
+
+    gap = _mm(
+        obj.FrontGap
+    )
+
+    front_t = _mm(
+        obj.FrontThickness
+    )
+
+    front_h = max(
+        0.0,
+        H
+        - plinth
+        - 2.0 * gap,
+    )
+
+    # Perpendicular corner spacer:
+    # height = cabinet body height without plinth.
+    filler_w = max(
+        0.0,
+        F,
+    )
+
+    if (
+        filler_w > 0.0
+        and body_h > 0.0
+    ):
+        parts.append(
+            _part(
+                "Corner Spacer Filler",
+                "Filler",
+                body_h,
+                filler_w,
+                front_t,
+                front_material,
+                edge_material=edge,
+                edge_thickness=edge_t,
+                edge_length=body_h,
+                edge_count=1,
+                edge_front=True,
+            )
+        )
+
+        # Matching perpendicular toe-kick return.
+        #
+        # Its real length is the distance between the parent's recessed
+        # plinth and the linked 90° cabinet's near plinth end.
+        if plinth > 0.0:
+            blind_side = str(
+                getattr(
+                    obj,
+                    "BlindSide",
+                    "Left",
+                )
+            )
+
+            # Exact production length of the perpendicular toe-kick return.
+            #
+            # Long-cabinet plinth line:
+            #   (D - F) - setback - T
+            #
+            # Mate boundary:
+            #   D
+            #
+            # Therefore:
+            #   return_len = F + setback + T
+            #
+            # No extra T is added at the mate end because the joint is a
+            # butt joint, not an overlap.
+            return_len = max(
+                T,
+                filler_w
+                + setback
+                + T,
+            )
+
+            parts.append(
+                _part(
+                    "Plinth Return",
+                    "Plinth",
+                    return_len,
+                    plinth,
+                    T,
+                    board,
+                    edge_material=edge,
+                    edge_thickness=edge_t,
+                    edge_length=return_len,
+                    edge_count=1,
+                    edge_front=True,
+                )
+            )
+
+    clearance_w = max(
+        0.0,
+        C,
+    )
+
+    if (
+        clearance_w > 0.0
+        and body_h > 0.0
+    ):
+        parts.append(
+            _part(
+                "Door Clearance Filler",
+                "Filler",
+                body_h,
+                clearance_w,
+                front_t,
+                front_material,
+                edge_material=edge,
+                edge_thickness=edge_t,
+                edge_length=body_h,
+                edge_count=1,
+                edge_front=True,
+            )
+        )
+
+    front_type = str(
+        getattr(
+            obj,
+            "FrontType",
+            "Open",
+        )
+    )
+
+    usable_front_w = max(
+        0.0,
+        main_clear_w
+        - clearance_w
+        - 2.0 * gap,
+    )
+
+    if (
+        front_type != "Open"
+        and usable_front_w > 0.0
+        and front_h > 0.0
+    ):
+        if front_type == "Double Door":
+            each_w = max(
+                0.0,
+                (
+                    usable_front_w
+                    - gap
+                ) / 2.0,
+            )
+
+            parts.append(
+                _part(
+                    "Front",
+                    "Front",
+                    front_h,
+                    each_w,
+                    front_t,
+                    front_material,
+                    quantity=2,
+                    edge_material=edge,
+                    edge_thickness=edge_t,
+                    edge_length=2.0 * (
+                        front_h
+                        + each_w
+                    ),
+                    edge_count=4,
+                    edge_front=True,
+                    edge_back=True,
+                    edge_left=True,
+                    edge_right=True,
+                )
+            )
+
+        elif front_type == "Drawers":
+            drawer_count = max(
+                1,
+                int(
+                    getattr(
+                        obj,
+                        "DrawerCount",
+                        3,
+                    )
+                ),
+            )
+
+            each_h = max(
+                0.0,
+                (
+                    front_h
+                    - (
+                        drawer_count - 1
+                    ) * gap
+                )
+                / drawer_count,
+            )
+
+            parts.append(
+                _part(
+                    "Drawer Front",
+                    "Front",
+                    each_h,
+                    usable_front_w,
+                    front_t,
+                    front_material,
+                    quantity=drawer_count,
+                    edge_material=edge,
+                    edge_thickness=edge_t,
+                    edge_length=2.0 * (
+                        each_h
+                        + usable_front_w
+                    ),
+                    edge_count=4,
+                    edge_front=True,
+                    edge_back=True,
+                    edge_left=True,
+                    edge_right=True,
+                )
+            )
+
+        elif front_type == "Door + Drawers":
+            drawer_h = min(
+                max(
+                    0.0,
+                    _mm(
+                        obj.DrawerZoneHeight
+                    ),
+                ),
+                max(
+                    0.0,
+                    front_h - gap,
+                ),
+            )
+
+            door_h = max(
+                0.0,
+                front_h
+                - drawer_h
+                - gap,
+            )
+
+            if drawer_h > 0.0:
+                parts.append(
+                    _part(
+                        "Drawer Front",
+                        "Front",
+                        drawer_h,
+                        usable_front_w,
+                        front_t,
+                        front_material,
+                        edge_material=edge,
+                        edge_thickness=edge_t,
+                        edge_length=2.0 * (
+                            drawer_h
+                            + usable_front_w
+                        ),
+                        edge_count=4,
+                        edge_front=True,
+                        edge_back=True,
+                        edge_left=True,
+                        edge_right=True,
+                    )
+                )
+
+            if door_h > 0.0:
+                parts.append(
+                    _part(
+                        "Door Front",
+                        "Front",
+                        door_h,
+                        usable_front_w,
+                        front_t,
+                        front_material,
+                        edge_material=edge,
+                        edge_thickness=edge_t,
+                        edge_length=2.0 * (
+                            door_h
+                            + usable_front_w
+                        ),
+                        edge_count=4,
+                        edge_front=True,
+                        edge_back=True,
+                        edge_left=True,
+                        edge_right=True,
+                    )
+                )
+
+        else:
+            parts.append(
+                _part(
+                    "Front",
+                    "Front",
+                    front_h,
+                    usable_front_w,
+                    front_t,
+                    front_material,
+                    edge_material=edge,
+                    edge_thickness=edge_t,
+                    edge_length=2.0 * (
+                        front_h
+                        + usable_front_w
+                    ),
+                    edge_count=4,
+                    edge_front=True,
+                    edge_back=True,
+                    edge_left=True,
+                    edge_right=True,
+                )
+            )
+
+    return parts
+
+
 def _corner_parts(obj):
     """Mirror the accepted Corner Generator 1.7 production geometry."""
 
@@ -1050,6 +1579,10 @@ def build_board_parts(obj):
         "Corner Wall",
     }:
         parts = _corner_parts(
+            obj
+        )
+    elif cabinet_type == "Blind Corner Base":
+        parts = _blind_corner_parts(
             obj
         )
     else:

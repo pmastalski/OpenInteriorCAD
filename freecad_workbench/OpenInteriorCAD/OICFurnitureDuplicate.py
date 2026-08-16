@@ -22,7 +22,7 @@ def duplicate_furniture(
     furniture,
     side="right",
 ):
-    """Duplicate Cabinet and preserve standard/corner configuration."""
+    """Duplicate Cabinet and preserve standard/corner/blind configuration."""
 
     document = furniture.Document
 
@@ -79,6 +79,12 @@ def duplicate_furniture(
         "drawer_count": "DrawerCount",
         "drawer_zone_height": "DrawerZoneHeight",
         "corner_opening_width": "CornerOpeningWidth",
+        "blind_box_width": "BlindBoxWidth",
+        "blind_filler_width": "BlindFillerWidth",
+        "blind_door_filler_width": "BlindDoorFillerWidth",
+        "blind_mate_width": "BlindMateWidth",
+        "blind_mate_depth": "BlindMateDepth",
+        "blind_side": "BlindSide",
     }
 
     for argument, property_name in mapping.items():
@@ -94,6 +100,7 @@ def duplicate_furniture(
             "CabinetType",
             "GeometryMode",
             "FrontType",
+            "BlindSide",
         }:
             kwargs[argument] = str(
                 value
