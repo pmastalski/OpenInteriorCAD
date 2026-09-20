@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import json
 
+from OICTallZones import layout as tall_zone_layout, front_bounds as tall_front_bounds
+from OICDrawerLayout import heights as drawer_heights
+
 
 DEFAULT_BOARD_MATERIAL = "Carcass Board"
 DEFAULT_FRONT_MATERIAL = "Front Board"
@@ -222,42 +225,46 @@ def _standard_parts(obj):
 
     plinth = (
         _mm(obj.PlinthHeight)
-        if cabinet_type == "Base"
+        if cabinet_type in ("Base", "Tall")
         else 0.0
     )
 
     body_h = max(0.0, H - plinth)
     clear_h = max(0.0, body_h - 2.0 * T)
+    carcass_depth = max(0.0, D - BT)
 
     board = materials["board"]
     back = materials["back"]
     edge = materials["edge"]
     edge_t = materials["edge_thickness"]
 
+    extended = str(getattr(obj, "ExtendedSides", "None")) if cabinet_type in ("Base", "Tall") else "None"
+    left_ext = extended in ("Left", "Both")
+    right_ext = extended in ("Right", "Both")
     parts = [
         _part(
             "Left Side",
             "Side",
-            clear_h,
-            D,
+            H if left_ext else body_h,
+            carcass_depth,
             T,
             board,
             edge_material=edge,
             edge_thickness=edge_t,
-            edge_length=clear_h,
+            edge_length=H if left_ext else body_h,
             edge_count=1,
             edge_front=True,
         ),
         _part(
             "Right Side",
             "Side",
-            clear_h,
-            D,
+            H if right_ext else body_h,
+            carcass_depth,
             T,
             board,
             edge_material=edge,
             edge_thickness=edge_t,
-            edge_length=clear_h,
+            edge_length=H if right_ext else body_h,
             edge_count=1,
             edge_front=True,
         ),
@@ -265,7 +272,7 @@ def _standard_parts(obj):
             "Bottom",
             "Bottom",
             max(0.0, W - 2.0 * T),
-            D,
+            carcass_depth,
             T,
             board,
             edge_material=edge,
@@ -278,7 +285,7 @@ def _standard_parts(obj):
             "Top",
             "Top",
             max(0.0, W - 2.0 * T),
-            D,
+            carcass_depth,
             T,
             board,
             edge_material=edge,
@@ -290,23 +297,29 @@ def _standard_parts(obj):
         _part(
             "Back",
             "Back",
-            max(0.0, W - 2.0 * T),
-            clear_h,
+            W,
+            body_h,
             BT,
             back,
         ),
     ]
 
+    tall_zones = (
+        tall_zone_layout(str(getattr(obj, "TallZonesJSON", "")), H, plinth, T)
+        if cabinet_type == "Tall" else []
+    )
+    for i in range(max(0, len(tall_zones) - 1)):
+        parts.append(_part(
+            "Zone Divider {:02d}".format(i + 1), "Shelf",
+            max(0.0, W - 2 * T), carcass_depth, T, board,
+            edge_material=edge, edge_thickness=edge_t,
+            edge_front=True,
+        ))
+
     shelf_count = max(
         0,
-        int(
-            getattr(
-                obj,
-                "ShelfCount",
-                0,
-            )
-        ),
-    )
+        int(getattr(obj, "ShelfCount", 0)),
+    ) if not tall_zones else 0
 
     if shelf_count:
         shelf_length = max(
@@ -332,10 +345,7 @@ def _standard_parts(obj):
         )
 
     if plinth > 0.0:
-        plinth_length = max(
-            0.0,
-            W - 2.0 * T,
-        )
+        plinth_length = max(0.0, W - T * int(left_ext) - T * int(right_ext))
 
         parts.append(
             _part(
@@ -361,7 +371,37 @@ def _standard_parts(obj):
         )
     )
 
-    if front_type != "Open":
+    if tall_zones:
+        gap = _mm(obj.FrontGap)
+        ft = _mm(obj.FrontThickness)
+        fw = max(0.0, W - gap)
+        for i, (row, _z, clear_h) in enumerate(tall_zones, 1):
+            kind = row["type"]
+            if kind in ("Open", "Oven", "Microwave"):
+                continue
+            _front_z, fh = tall_front_bounds(tall_zones, i - 1, T, gap)
+            count = 2 if kind == "Double Door" else row["drawers"] if kind == "Drawers" else 1
+            pw = (fw - gap) / 2 if kind == "Double Door" else fw
+            sizes = (drawer_heights(
+                fh, count, gap, row.get("drawer_heights", []),
+            ) if kind == "Drawers" else [fh])
+            if pw <= 0:
+                continue
+            for drawer_index, ph in enumerate(sizes, 1):
+                if ph <= 0:
+                    continue
+                label = "Zone {:02d} {} Front".format(i, kind)
+                if kind == "Drawers":
+                    label += " {:02d}".format(drawer_index)
+                parts.append(_part(
+                    label, "Front", ph, pw, ft, materials["front"],
+                    quantity=1 if kind == "Drawers" else count,
+                    edge_material=edge, edge_thickness=edge_t,
+                    edge_front=True, edge_back=True, edge_left=True,
+                    edge_right=True,
+                ))
+
+    if front_type != "Open" and not tall_zones:
         front_t = _mm(
             obj.FrontThickness
         )
@@ -370,13 +410,14 @@ def _standard_parts(obj):
         )
         front_h = max(
             0.0,
-            H - plinth - 2.0 * gap,
+            H - plinth - 2.0 * gap
+            + (max(0.0, _mm(getattr(obj, "WallFrontDrop", 0.0))) if cabinet_type == "Wall" else 0.0),
         )
 
         if front_type == "Double Door":
             front_w = max(
                 0.0,
-                (W - 3.0 * gap) / 2.0,
+                (W - 2.0 * gap) / 2.0,
             )
 
             parts.append(
@@ -413,44 +454,26 @@ def _standard_parts(obj):
 
             front_w = max(
                 0.0,
-                W - 2.0 * gap,
+                W - gap,
             )
-
-            front_each_h = max(
-                0.0,
-                (
-                    front_h
-                    - (drawer_count - 1) * gap
-                )
-                / drawer_count,
+            sizes = drawer_heights(
+                front_h, drawer_count, gap,
+                getattr(obj, "DrawerHeightsJSON", "[]"),
             )
-
-            parts.append(
-                _part(
-                    "Drawer Front",
-                    "Front",
-                    front_each_h,
-                    front_w,
-                    front_t,
-                    materials["front"],
-                    quantity=drawer_count,
-                    edge_material=edge,
-                    edge_thickness=edge_t,
-                    edge_length=2.0 * (
-                        front_each_h + front_w
-                    ),
-                    edge_count=4,
-                    edge_front=True,
-                    edge_back=True,
-                    edge_left=True,
-                    edge_right=True,
-                )
-            )
+            for drawer_index, front_each_h in enumerate(sizes, 1):
+                parts.append(_part(
+                    "Drawer Front {:02d}".format(drawer_index), "Front",
+                    front_each_h, front_w, front_t, materials["front"],
+                    quantity=1, edge_material=edge, edge_thickness=edge_t,
+                    edge_length=2.0 * (front_each_h + front_w),
+                    edge_count=4, edge_front=True, edge_back=True,
+                    edge_left=True, edge_right=True,
+                ))
 
         else:
             front_w = max(
                 0.0,
-                W - 2.0 * gap,
+                W - gap,
             )
 
             parts.append(
@@ -559,7 +582,7 @@ def _blind_corner_parts(obj):
             "Left Side",
             "Side",
             body_h,
-            body_depth,
+            inner_depth,
             T,
             board,
             edge_material=edge,
@@ -572,7 +595,7 @@ def _blind_corner_parts(obj):
             "Right Side",
             "Side",
             body_h,
-            body_depth,
+            inner_depth,
             T,
             board,
             edge_material=edge,
@@ -622,11 +645,8 @@ def _blind_corner_parts(obj):
         _part(
             "Back",
             "Back",
-            max(
-                0.0,
-                W - 2.0 * T,
-            ),
-            clear_h,
+            W,
+            body_h,
             BT,
             back,
         ),
@@ -827,7 +847,7 @@ def _blind_corner_parts(obj):
         0.0,
         main_clear_w
         - clearance_w
-        - 2.0 * gap,
+        - gap,
     )
 
     if (
@@ -878,40 +898,19 @@ def _blind_corner_parts(obj):
                     )
                 ),
             )
-
-            each_h = max(
-                0.0,
-                (
-                    front_h
-                    - (
-                        drawer_count - 1
-                    ) * gap
-                )
-                / drawer_count,
+            sizes = drawer_heights(
+                front_h, drawer_count, gap,
+                getattr(obj, "DrawerHeightsJSON", "[]"),
             )
-
-            parts.append(
-                _part(
-                    "Drawer Front",
-                    "Front",
-                    each_h,
-                    usable_front_w,
-                    front_t,
-                    front_material,
-                    quantity=drawer_count,
-                    edge_material=edge,
-                    edge_thickness=edge_t,
-                    edge_length=2.0 * (
-                        each_h
-                        + usable_front_w
-                    ),
-                    edge_count=4,
-                    edge_front=True,
-                    edge_back=True,
-                    edge_left=True,
-                    edge_right=True,
-                )
-            )
+            for drawer_index, each_h in enumerate(sizes, 1):
+                parts.append(_part(
+                    "Drawer Front {:02d}".format(drawer_index), "Front",
+                    each_h, usable_front_w, front_t, front_material,
+                    quantity=1, edge_material=edge, edge_thickness=edge_t,
+                    edge_length=2.0 * (each_h + usable_front_w),
+                    edge_count=4, edge_front=True, edge_back=True,
+                    edge_left=True, edge_right=True,
+                ))
 
         elif front_type == "Door + Drawers":
             drawer_h = min(

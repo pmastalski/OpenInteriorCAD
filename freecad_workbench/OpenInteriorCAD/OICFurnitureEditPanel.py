@@ -1,5 +1,9 @@
 """Edit panel for the universal OpenInteriorCAD Cabinet."""
 
+import json
+from OICTallZones import ZONE_TYPES, example_zones, decode, layout as tall_zone_layout, front_bounds as tall_front_bounds
+from OICDrawerLayout import heights as resolve_drawers, decode as decode_drawers, auto_index as drawer_auto_index, MIN_FRONT
+
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide import QtWidgets
@@ -31,6 +35,9 @@ class FurnitureEditPanel:
     ):
         self.furniture = furniture
         self._updating = False
+        self._drawer_custom = decode_drawers(
+            str(getattr(furniture, "DrawerHeightsJSON", "[]"))
+        )
 
         self.form = QtWidgets.QWidget()
         self.form.setWindowTitle(
@@ -376,6 +383,38 @@ class FurnitureEditPanel:
             self.blind_group
         )
 
+        # TALL CABINET — independent compartments from bottom to top.
+        self.tall_group = QtWidgets.QGroupBox("Tall Cabinet - Independent Zones")
+        tall_layout = QtWidgets.QVBoxLayout(self.tall_group)
+        tall_layout.addWidget(QtWidgets.QLabel(
+            "Bottom to top. Height = clear compartment height (mm); "
+            "0 = remaining height. Oven/Microwave are empty niches."
+        ))
+        self.tall_table = QtWidgets.QTableWidget(0, 3)
+        self.tall_table.setHorizontalHeaderLabels(
+            ["Zone type", "Clear height (mm)", "Drawers"]
+        )
+        self.tall_table.horizontalHeader().setStretchLastSection(True)
+        self.tall_table.setMinimumHeight(190)
+        tall_layout.addWidget(self.tall_table)
+        tall_buttons = QtWidgets.QHBoxLayout()
+        self.tall_example_button = QtWidgets.QPushButton("Example: oven + microwave")
+        self.tall_add_button = QtWidgets.QPushButton("Add zone")
+        self.tall_remove_button = QtWidgets.QPushButton("Remove")
+        self.tall_up_button = QtWidgets.QPushButton("Up")
+        self.tall_down_button = QtWidgets.QPushButton("Down")
+        self.tall_auto_button = QtWidgets.QPushButton("Auto Height")
+        self.tall_drawer_button = QtWidgets.QPushButton("Drawer heights...")
+        for button in (self.tall_example_button, self.tall_add_button,
+                       self.tall_remove_button, self.tall_up_button,
+                       self.tall_down_button, self.tall_auto_button,
+                       self.tall_drawer_button):
+            tall_buttons.addWidget(button)
+        tall_layout.addLayout(tall_buttons)
+        self.tall_status = QtWidgets.QLabel("")
+        tall_layout.addWidget(self.tall_status)
+        layout.addWidget(self.tall_group)
+
         # CARCASS
         carcass_group = (
             QtWidgets.QGroupBox(
@@ -425,6 +464,11 @@ class FurnitureEditPanel:
                 1000.0,
             )
         )
+
+        self.extended_sides_combo = QtWidgets.QComboBox()
+        self.extended_sides_combo.addItems(["None", "Left", "Right", "Both"])
+        self.extended_sides_label = QtWidgets.QLabel("Floor-reaching Sides:")
+        carcass_layout.addRow(self.extended_sides_label, self.extended_sides_combo)
 
         carcass_layout.addRow(
             "Panel Thickness:",
@@ -497,6 +541,12 @@ class FurnitureEditPanel:
                 50.0,
             )
         )
+        self.front_gap_input.setToolTip(
+            "Global clear gap: full value between drawers / door leaves "
+            "and at the top and bottom; half on the left and right "
+            "outer edges. Example: 2 mm = 2 mm between fronts, "
+            "1 mm at either side."
+        )
 
         self.drawer_count_input = (
             QtWidgets.QSpinBox()
@@ -513,6 +563,10 @@ class FurnitureEditPanel:
                 1000.0,
             )
         )
+
+        self.wall_front_drop_input = self._length_spin(0.0, 500.0)
+        self.wall_front_drop_label = QtWidgets.QLabel("Front Drop Below Cabinet:")
+        front_layout.addRow(self.wall_front_drop_label, self.wall_front_drop_input)
 
         front_layout.addRow(
             "Front Type:",
@@ -539,6 +593,9 @@ class FurnitureEditPanel:
             self.drawer_count_label,
             self.drawer_count_input,
         )
+
+        self.drawer_division_button = QtWidgets.QPushButton("Set individual heights...")
+        front_layout.addRow(self.drawer_division_button)
 
         self.drawer_zone_label = (
             QtWidgets.QLabel(
@@ -681,6 +738,15 @@ class FurnitureEditPanel:
 
         layout.addStretch()
 
+        self.tall_example_button.clicked.connect(self._tall_example)
+        self.tall_add_button.clicked.connect(self._tall_add)
+        self.tall_remove_button.clicked.connect(self._tall_remove)
+        self.tall_up_button.clicked.connect(lambda: self._tall_move(-1))
+        self.tall_down_button.clicked.connect(lambda: self._tall_move(1))
+        self.tall_auto_button.clicked.connect(self._tall_auto_height)
+        self.tall_drawer_button.clicked.connect(self._edit_tall_drawers)
+        self.extended_sides_combo.currentTextChanged.connect(self._values_changed)
+
         # SIGNALS
         self.type_combo.currentTextChanged.connect(
             self._type_changed
@@ -720,6 +786,7 @@ class FurnitureEditPanel:
             self.rotation_input,
             self.front_thickness_input,
             self.front_gap_input,
+            self.wall_front_drop_input,
             self.drawer_count_input,
             self.drawer_zone_height_input,
             self.blind_box_width_input,
@@ -731,6 +798,8 @@ class FurnitureEditPanel:
             widget.valueChanged.connect(
                 self._values_changed
             )
+
+        self.drawer_division_button.clicked.connect(self._edit_standard_drawers)
 
         self.apply_mount_button.clicked.connect(
             self._apply_mount_height
@@ -869,6 +938,8 @@ class FurnitureEditPanel:
             self.front_gap_input.setValue(
                 self.furniture.FrontGap.Value
             )
+            self.wall_front_drop_input.setValue(float(getattr(self.furniture, "WallFrontDrop", 0.0)))
+            self.extended_sides_combo.setCurrentText(str(getattr(self.furniture, "ExtendedSides", "None")))
 
             self.drawer_count_input.setValue(
                 int(
@@ -879,6 +950,8 @@ class FurnitureEditPanel:
             self.drawer_zone_height_input.setValue(
                 self.furniture.DrawerZoneHeight.Value
             )
+
+            self._tall_fill(decode(str(getattr(self.furniture, "TallZonesJSON", ""))))
 
         finally:
             self._updating = False
@@ -919,6 +992,13 @@ class FurnitureEditPanel:
             is_blind
         )
 
+        self.tall_group.setVisible(cabinet_type == CABINET_TALL)
+        can_extend = cabinet_type in (CABINET_BASE, CABINET_TALL)
+        self.extended_sides_combo.setVisible(can_extend)
+        self.extended_sides_label.setVisible(can_extend)
+        self.wall_front_drop_input.setVisible(cabinet_type == CABINET_WALL)
+        self.wall_front_drop_label.setVisible(cabinet_type == CABINET_WALL)
+
         self.wall_group.setVisible(
             is_wall
         )
@@ -931,9 +1011,7 @@ class FurnitureEditPanel:
             not is_wall
         )
 
-        self.front_group.setEnabled(
-            True
-        )
+        self.front_group.setEnabled(True)
 
         self._refresh_front_type_options(
             is_corner
@@ -1056,6 +1134,306 @@ class FurnitureEditPanel:
         self.drawer_zone_height_input.setVisible(
             is_door_drawers
         )
+        self.drawer_division_button.setVisible(is_drawers)
+
+    def _drawer_dialog(self, total, count, gap, current, title):
+        """Edit any n-1 heights, select any one drawer as the auto remainder.
+
+        Front order is bottom-to-top. A radio button determines which front is
+        calculated, so the automatic height is NOT tied to the last/top row.
+        """
+        initial = resolve_drawers(total, count, gap, current)
+        if not initial:
+            QtWidgets.QMessageBox.warning(
+                self.form, title,
+                "Not enough available front height for this number of drawers "
+                "and the selected Front Gap. Check cabinet/zone dimensions.",
+            )
+            return None
+
+        auto = drawer_auto_index(current, count)
+        dialog = QtWidgets.QDialog(self.form)
+        dialog.setWindowTitle(title)
+        layout = QtWidgets.QVBoxLayout(dialog)
+        layout.addWidget(QtWidgets.QLabel(
+            "Drawer fronts from BOTTOM to TOP (mm). Select 'Auto' beside any "
+            "drawer; its height fills the exact remaining space. "
+            "The Front Gap is deducted automatically."
+        ))
+
+        fields = []
+        auto_buttons = []
+        group = QtWidgets.QButtonGroup(dialog)
+        group.setExclusive(True)
+        for i, h in enumerate(initial):
+            line = QtWidgets.QHBoxLayout()
+            line.addWidget(QtWidgets.QLabel("Drawer {:02d}:".format(i + 1)))
+            spin = self._length_spin(MIN_FRONT, max(MIN_FRONT, total), decimals=2)
+            spin.setValue(h)
+            fields.append(spin)
+            line.addWidget(spin)
+            radio = QtWidgets.QRadioButton("Auto")
+            group.addButton(radio, i)
+            radio.setChecked(i == auto)
+            auto_buttons.append(radio)
+            line.addWidget(radio)
+            layout.addLayout(line)
+
+        info = QtWidgets.QLabel("")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        layout.addWidget(buttons)
+        ok_button = buttons.button(QtWidgets.QDialogButtonBox.Ok)
+        usable = total - gap * (count - 1)
+
+        def sync(*_):
+            chosen = group.checkedId()
+            if chosen < 0:
+                return
+            remainder = usable - sum(
+                field.value() for index, field in enumerate(fields)
+                if index != chosen
+            )
+            valid = MIN_FRONT - 0.001 <= remainder <= fields[chosen].maximum() + 0.001
+            fields[chosen].blockSignals(True)
+            fields[chosen].setValue(max(MIN_FRONT, min(fields[chosen].maximum(), remainder)))
+            fields[chosen].blockSignals(False)
+            for index, field in enumerate(fields):
+                is_auto = index == chosen
+                field.setReadOnly(is_auto)
+                field.setButtonSymbols(
+                    QtWidgets.QAbstractSpinBox.NoButtons if is_auto
+                    else QtWidgets.QAbstractSpinBox.UpDownArrows
+                )
+                field.setToolTip(
+                    "Calculated automatically from the other drawer heights."
+                    if is_auto else "Enter this drawer front height in mm."
+                )
+            info.setText(
+                "Front envelope: {:.2f} mm | internal gaps: {:.2f} mm | "
+                "Drawer {:02d} (Auto): {:.2f} mm".format(
+                    total, gap * (count - 1), chosen + 1, remainder,
+                ) if valid else
+                "Not enough space: reduce the entered heights to leave at "
+                "least {:.1f} mm for Drawer {:02d}.".format(MIN_FRONT, chosen + 1)
+            )
+            ok_button.setEnabled(valid)
+
+        for field in fields:
+            field.valueChanged.connect(sync)
+        for radio in auto_buttons:
+            radio.toggled.connect(sync)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        sync()
+        if dialog.exec_() != QtWidgets.QDialog.Accepted:
+            return None
+        chosen = group.checkedId()
+        return [None if index == chosen else field.value()
+                for index, field in enumerate(fields)]
+
+    def _edit_standard_drawers(self):
+        count = self.drawer_count_input.value()
+        total = (self.height_input.value()
+                 - (self.plinth_height_input.value()
+                    if self.type_combo.currentText() != CABINET_WALL else 0.0)
+                 - 2.0 * self.front_gap_input.value())
+        if self.type_combo.currentText() == CABINET_WALL:
+            total += self.wall_front_drop_input.value()
+        values = self._drawer_dialog(
+            total, count, self.front_gap_input.value(),
+            self._drawer_custom, "Drawer front heights",
+        )
+        if values is not None:
+            self._drawer_custom = values
+            self._values_changed()
+
+    def _edit_tall_drawers(self):
+        index = self.tall_table.currentRow()
+        rows = self._tall_read()
+        if index < 0 or index >= len(rows) or rows[index]["type"] != "Drawers":
+            QtWidgets.QMessageBox.information(
+                self.form, "Drawer heights", "Select a Drawers zone first."
+            )
+            return
+        zones = tall_zone_layout(
+            json.dumps(rows), self.height_input.value(),
+            self.plinth_height_input.value(), self.panel_input.value(),
+        )
+        if not zones:
+            QtWidgets.QMessageBox.warning(
+                self.form, "Drawer heights", "Correct the tall-zone heights first."
+            )
+            return
+        _start, total = tall_front_bounds(
+            zones, index, self.panel_input.value(), self.front_gap_input.value(),
+        )
+        values = self._drawer_dialog(
+            total, rows[index]["drawers"], self.front_gap_input.value(),
+            rows[index].get("drawer_heights", []),
+            "Zone {:02d} drawer front heights".format(index + 1),
+        )
+        if values is not None:
+            rows[index]["drawer_heights"] = values
+            self._tall_fill(rows)
+            self.tall_table.selectRow(index)
+            self._values_changed()
+
+    def _tall_read(self):
+        rows = []
+        for i in range(self.tall_table.rowCount()):
+            rows.append({
+                "type": self.tall_table.cellWidget(i, 0).currentText(),
+                "height": self.tall_table.cellWidget(i, 1).value(),
+                "drawers": self.tall_table.cellWidget(i, 2).value(),
+                "drawer_heights": (
+                    self.tall_table.cellWidget(i, 2).property("oic_heights") or []
+                ),
+            })
+        return rows
+
+    def _tall_fill(self, rows):
+        self._updating = True
+        try:
+            self.tall_table.setRowCount(0)
+            for row in rows:
+                i = self.tall_table.rowCount()
+                self.tall_table.insertRow(i)
+                kind = QtWidgets.QComboBox()
+                kind.addItems(ZONE_TYPES)
+                kind.setCurrentText(row["type"])
+                height = self._length_spin(0, 10000)
+                height.setValue(row["height"])
+                drawers = QtWidgets.QSpinBox()
+                drawers.setRange(1, 12)
+                drawers.setValue(row["drawers"])
+                drawers.setProperty("oic_heights", row.get("drawer_heights", []))
+                self.tall_table.setCellWidget(i, 0, kind)
+                self.tall_table.setCellWidget(i, 1, height)
+                self.tall_table.setCellWidget(i, 2, drawers)
+                kind.currentTextChanged.connect(self._tall_changed)
+                height.valueChanged.connect(self._tall_changed)
+                drawers.valueChanged.connect(self._tall_changed)
+        finally:
+            self._updating = False
+        self._tall_status_update()
+
+    def _tall_status_update(self):
+        rows = self._tall_read()
+        if not rows:
+            self.tall_status.setText("No zones: legacy Tall cabinet layout.")
+            return
+        raw = json.dumps(rows)
+        zones = tall_zone_layout(
+            raw, self.height_input.value(), self.plinth_height_input.value(),
+            self.panel_input.value(),
+        )
+        if not zones:
+            self.tall_status.setText(
+                "INVALID: total clear heights + partitions must equal "
+                "available space. Use one 0 mm row for automatic remainder."
+            )
+        else:
+            self.tall_status.setText(
+                "OK: {} zones, {} internal dividers. Auto height: {} mm".format(
+                    len(zones), len(zones)-1,
+                    round(next((h for r, z, h in zones if r["height"] == 0), 0), 1),
+                )
+            )
+
+    def _tall_changed(self, *_args):
+        if self._updating:
+            return
+        self._tall_status_update()
+        self._values_changed()
+
+    def _tall_example(self):
+        self._tall_fill(example_zones())
+        self._values_changed()
+
+    def _tall_add(self):
+        rows = self._tall_read()
+        rows.append({"type": "Single Door", "height": 0 if not any(
+            r["height"] == 0 for r in rows) else 300, "drawers": 1})
+        self._tall_fill(rows)
+        self._values_changed()
+
+    def _tall_auto_height(self):
+        """Write the calculated remaining clear height into the last zone.
+
+        Height 0 remains supported by the zone engine as an automatic value,
+        but the button must fill the visible spin box with the actual number.
+        """
+        rows = self._tall_read()
+        if not rows:
+            self.tall_status.setText("Add a zone before using Auto Height.")
+            return
+
+        # Auto Height fills the LAST height field, as opposed to merely
+        # storing the sentinel 0 (which looks like a broken UI).
+        index = len(rows) - 1
+        old_layout = tall_zone_layout(
+            json.dumps(rows), self.height_input.value(),
+            self.plinth_height_input.value(), self.panel_input.value(),
+        )
+
+        # If another zone was formerly automatic, freeze its currently
+        # calculated height before calculating the last zone.
+        for i, row in enumerate(rows):
+            if i != index and row["height"] == 0.0:
+                if not old_layout:
+                    self.tall_status.setText(
+                        "Set the height of the other automatic zone first."
+                    )
+                    return
+                row["height"] = old_layout[i][2]
+
+        thickness = self.panel_input.value()
+        usable = (
+            self.height_input.value()
+            - self.plinth_height_input.value()
+            - 2.0 * thickness
+            - (len(rows) - 1) * thickness
+        )
+        remaining = usable - sum(
+            row["height"] for i, row in enumerate(rows) if i != index
+        )
+        if remaining < 40.0:
+            self.tall_status.setText(
+                "Cannot fill last zone: remaining clear height is "
+                f"{remaining:.1f} mm (minimum 40 mm)."
+            )
+            return
+
+        # QDoubleSpinBox keeps the same decimal precision as manually typed
+        # values. The last zone is now an explicit editable dimension.
+        rows[index]["height"] = round(remaining, 1)
+        self._tall_fill(rows)
+        self.tall_table.selectRow(index)
+        self._values_changed()
+
+    def _tall_remove(self):
+        row = self.tall_table.currentRow()
+        if row < 0:
+            return
+        rows = self._tall_read()
+        rows.pop(row)
+        self._tall_fill(rows)
+        self._values_changed()
+
+    def _tall_move(self, step):
+        i = self.tall_table.currentRow()
+        rows = self._tall_read()
+        j = i + step
+        if not (0 <= i < len(rows) and 0 <= j < len(rows)):
+            return
+        rows[i], rows[j] = rows[j], rows[i]
+        self._tall_fill(rows)
+        self.tall_table.selectRow(j)
+        self._values_changed()
 
     def _front_type_changed(
         self,
@@ -1126,6 +1504,14 @@ class FurnitureEditPanel:
         self,
         *args,
     ):
+        if not self._updating and self.type_combo.currentText() == CABINET_TALL:
+            # An ordinary 850 mm base cabinet cannot contain the example's
+            # clear oven + microwave niches. Seed useful Tall dimensions.
+            if self.height_input.value() < 1750.0:
+                self.height_input.setValue(2200.0)
+            if not self._tall_read():
+                self._tall_fill(example_zones())
+
         if (
             not self._updating
             and self.type_combo.currentText()
@@ -1285,6 +1671,11 @@ class FurnitureEditPanel:
             self.furniture.FrontGap = (
                 self.front_gap_input.value()
             )
+            self.furniture.WallFrontDrop = self.wall_front_drop_input.value()
+            self.furniture.ExtendedSides = self.extended_sides_combo.currentText()
+
+            if "DrawerHeightsJSON" in self.furniture.PropertiesList:
+                self.furniture.DrawerHeightsJSON = json.dumps(self._drawer_custom)
 
             self.furniture.DrawerCount = (
                 self.drawer_count_input.value()
@@ -1293,6 +1684,9 @@ class FurnitureEditPanel:
             self.furniture.DrawerZoneHeight = (
                 self.drawer_zone_height_input.value()
             )
+
+            if "TallZonesJSON" in self.furniture.PropertiesList:
+                self.furniture.TallZonesJSON = json.dumps(self._tall_read())
 
             self.furniture.Document.recompute()
 

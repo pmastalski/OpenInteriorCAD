@@ -16,6 +16,9 @@ Move, Snap, Duplicate and Cabinet Run tools.
 import FreeCAD as App
 import Part
 
+from OICTallZones import example_zones, layout as tall_zone_layout, front_bounds as tall_front_bounds
+from OICDrawerLayout import heights as drawer_heights
+
 from OICBoardParts import build_board_parts, board_parts_json
 
 
@@ -73,6 +76,8 @@ class FurnitureProxy:
         blind_mate_width=600.0,
         blind_mate_depth=600.0,
         blind_side="Left",
+        wall_front_drop=0.0,
+        extended_sides="None",
     ):
         self._add_properties(obj)
         obj.Proxy = self
@@ -108,6 +113,11 @@ class FurnitureProxy:
         obj.BlindMateWidth = blind_mate_width
         obj.BlindMateDepth = blind_mate_depth
         obj.BlindSide = blind_side
+        obj.WallFrontDrop = wall_front_drop
+        obj.ExtendedSides = extended_sides
+
+        if cabinet_type == CABINET_TALL and height >= 1750.0:
+            obj.TallZonesJSON = __import__("json").dumps(example_zones())
 
         self.rebuild_geometry(obj)
 
@@ -115,6 +125,26 @@ class FurnitureProxy:
         def add(kind, name, group, help_text):
             if name not in obj.PropertiesList:
                 obj.addProperty(kind, name, group, help_text)
+
+        add("App::PropertyLength", "WallFrontDrop", "Front Layout",
+            "For Wall cabinet only: how far the front projects beneath the carcass.")
+        add("App::PropertyEnumeration", "ExtendedSides", "Carcass",
+            "Base/Tall: extend one or both side panels down to the floor.")
+        previous_extended = str(obj.ExtendedSides)
+        obj.ExtendedSides = ["None", "Left", "Right", "Both"]
+        obj.ExtendedSides = previous_extended if previous_extended in ("None", "Left", "Right", "Both") else "None"
+        add(
+            "App::PropertyString",
+            "DrawerHeightsJSON",
+            "Front Layout",
+            "Manual drawer-front heights bottom-to-top (last height automatic), JSON.",
+        )
+        add(
+            "App::PropertyString",
+            "TallZonesJSON",
+            "Tall Zones",
+            "Bottom-to-top independent clear-height zones as JSON. Height 0 = remaining space.",
+        )
 
         add(
             "App::PropertyString",
@@ -576,6 +606,9 @@ class FurnitureProxy:
             - 2.0 * panel
         )
 
+        # Cabinet Depth includes the externally applied back panel.
+        # All structural boards start at the inner face of the back
+        # and have the SAME carcass depth, including the side panels.
         inner_depth = (
             depth
             - back
@@ -593,28 +626,34 @@ class FurnitureProxy:
         ) <= 0.001:
             return Part.Shape()
 
+        extended = str(getattr(obj, "ExtendedSides", "None")) if (
+            str(obj.CabinetType) in (CABINET_BASE, CABINET_TALL) and use_plinth
+        ) else "None"
+        left_extended = extended in ("Left", "Both")
+        right_extended = extended in ("Right", "Both")
+
         shapes = [
             # Left side.
             Part.makeBox(
                 panel,
-                depth,
-                body_height,
+                inner_depth,
+                height if left_extended else body_height,
                 App.Vector(
                     0.0,
-                    0.0,
-                    plinth,
+                    back,
+                    0.0 if left_extended else plinth,
                 ),
             ),
 
             # Right side.
             Part.makeBox(
                 panel,
-                depth,
-                body_height,
+                inner_depth,
+                height if right_extended else body_height,
                 App.Vector(
                     width - panel,
-                    0.0,
-                    plinth,
+                    back,
+                    0.0 if right_extended else plinth,
                 ),
             ),
 
@@ -644,26 +683,44 @@ class FurnitureProxy:
                 ),
             ),
 
-            # Back.
+            # Full-overlay glued-on MDF back: outer width and whole
+            # carcass height.  No grooves or inset into the side panels.
             Part.makeBox(
-                inner_width,
+                width,
                 back,
-                inner_height,
+                body_height,
                 App.Vector(
-                    panel,
                     0.0,
-                    plinth
-                    + panel,
+                    0.0,
+                    plinth,
                 ),
             ),
         ]
+
+        tall_zones = (
+            tall_zone_layout(
+                str(getattr(obj, "TallZonesJSON", "")),
+                height, plinth, panel,
+            )
+            if str(obj.CabinetType) == CABINET_TALL
+            else []
+        )
+        if tall_zones:
+            # Dividers lie between clear openings. No global auto shelves
+            # are generated while the tall cabinet uses independent zones.
+            for index in range(len(tall_zones) - 1):
+                separator_z = tall_zones[index][1] + tall_zones[index][2]
+                shapes.append(Part.makeBox(
+                    inner_width, inner_depth, panel,
+                    App.Vector(panel, back, separator_z),
+                ))
 
         shelf_count = max(
             0,
             int(
                 obj.ShelfCount
             ),
-        )
+        ) if not tall_zones else 0
 
         if shelf_count > 0:
             available = (
@@ -726,18 +783,15 @@ class FurnitureProxy:
                 ),
             )
 
-            shapes.append(
-                Part.makeBox(
-                    width,
-                    panel,
-                    plinth,
-                    App.Vector(
-                        0.0,
-                        plinth_y,
-                        0.0,
-                    ),
-                )
-            )
+            # Butt joint: floor-reaching side panels replace the side
+            # portions of the plinth rather than intersecting it.
+            toe_start = panel if left_extended else 0.0
+            toe_width = width - toe_start - (panel if right_extended else 0.0)
+            if toe_width > 0.001:
+                shapes.append(Part.makeBox(
+                    toe_width, panel, plinth,
+                    App.Vector(toe_start, plinth_y, 0.0),
+                ))
 
         return Part.makeCompound(
             shapes
@@ -855,11 +909,11 @@ class FurnitureProxy:
             # Outer left side.
             Part.makeBox(
                 T,
-                body_depth,
+                inner_depth,
                 body_h,
                 App.Vector(
                     0.0,
-                    0.0,
+                    BT,
                     plinth,
                 ),
             ),
@@ -867,11 +921,11 @@ class FurnitureProxy:
             # Outer right side.
             Part.makeBox(
                 T,
-                body_depth,
+                inner_depth,
                 body_h,
                 App.Vector(
                     W - T,
-                    0.0,
+                    BT,
                     plinth,
                 ),
             ),
@@ -902,15 +956,16 @@ class FurnitureProxy:
                 ),
             ),
 
-            # Continuous back.
+            # Full-overlay MDF back glued onto the outside of the
+            # complete carcass outline; sides, top and bottom butt to it.
             Part.makeBox(
-                W - 2.0 * T,
+                W,
                 BT,
-                clear_h,
+                body_h,
                 App.Vector(
-                    T,
                     0.0,
-                    plinth + T,
+                    0.0,
+                    plinth,
                 ),
             ),
         ]
@@ -1968,7 +2023,7 @@ class FurnitureProxy:
                     0.0,
                     raw_main_right
                     - raw_main_left
-                    - 2.0 * gap
+                    - gap
                     - 1.0,
                 ),
             )
@@ -2002,7 +2057,7 @@ class FurnitureProxy:
                     0.0,
                     raw_main_right
                     - raw_main_left
-                    - 2.0 * gap
+                    - gap
                     - 1.0,
                 ),
             )
@@ -2019,7 +2074,7 @@ class FurnitureProxy:
         available_width = (
             main_right
             - main_left
-            - 2.0 * gap
+            - gap
         )
 
         if available_width <= 0.001:
@@ -2126,7 +2181,7 @@ class FurnitureProxy:
 
         closed_x = (
             main_left
-            + gap
+            + gap / 2.0
         )
 
         left_hinge_x = main_left
@@ -2261,20 +2316,15 @@ class FurnitureProxy:
                 ),
             )
 
-            drawer_h = (
-                front_h
-                - gap
-                * (
-                    count - 1
-                )
-            ) / count
+            sizes = drawer_heights(
+                front_h, count, gap,
+                getattr(obj, "DrawerHeightsJSON", "[]"),
+            )
 
-            if drawer_h > 0.001:
+            if sizes:
                 z = z_start
 
-                for _ in range(
-                    count
-                ):
+                for drawer_h in sizes:
                     panel = self._make_front_panel(
                         closed_x,
                         z,
@@ -2700,6 +2750,59 @@ class FurnitureProxy:
         return shape
 
 
+    def _make_tall_zone_fronts(self, obj):
+        """None = old tall mode; [] = invalid/empty zone model.
+
+        Appliance niches intentionally have NO false solid oven model: they
+        are clear openings between structural partitions.
+        """
+        raw = str(getattr(obj, "TallZonesJSON", ""))
+        if not raw:
+            return None
+        zones = tall_zone_layout(
+            raw, obj.Height.Value, obj.PlinthHeight.Value,
+            obj.PanelThickness.Value,
+        )
+        if not zones:
+            return []
+        w = obj.Width.Value
+        y = obj.Depth.Value
+        t = obj.FrontThickness.Value
+        gap = max(0.0, obj.FrontGap.Value)
+        out = []
+        for zone_index, (row, z, h) in enumerate(zones):
+            kind = row["type"]
+            if kind in ("Open", "Oven", "Microwave"):
+                continue
+            front_z, fh = tall_front_bounds(
+                zones, zone_index, obj.PanelThickness.Value, gap,
+            )
+            fw = w - gap
+            if fh <= 0 or fw <= 0:
+                continue
+            if kind == "Double Door":
+                leaf = (fw - gap) / 2
+                specs = [(gap / 2.0, front_z, leaf, fh),
+                         (1.5 * gap + leaf, front_z, leaf, fh)]
+            elif kind == "Drawers":
+                count = row["drawers"]
+                sizes = drawer_heights(
+                    fh, count, gap, row.get("drawer_heights", []),
+                )
+                specs = []
+                current_z = front_z
+                for each in sizes:
+                    specs.append((gap / 2.0, current_z, fw, each))
+                    current_z += each + gap
+            else:
+                specs = [(gap / 2.0, front_z, fw, fh)]
+            for x, z0, pw, ph in specs:
+                if pw > 0.001 and ph > 0.001:
+                    shape = self._make_front_panel(x, z0, pw, ph, y, t)
+                    if shape is not None:
+                        out.append(shape)
+        return out
+
     def _make_front_geometry(
         self,
         obj,
@@ -2732,6 +2835,11 @@ class FurnitureProxy:
                 obj
             )
 
+        if cabinet_type == CABINET_TALL:
+            zone_shapes = self._make_tall_zone_fronts(obj)
+            if zone_shapes is not None:
+                return zone_shapes
+
         if front_type == FRONT_OPEN:
             return []
 
@@ -2743,6 +2851,10 @@ class FurnitureProxy:
             return []
 
         z_start, front_height = vertical
+        if cabinet_type == CABINET_WALL:
+            drop = max(0.0, float(getattr(obj, "WallFrontDrop", 0.0)))
+            z_start -= drop
+            front_height += drop
 
         width = obj.Width.Value
         depth = obj.Depth.Value
@@ -2775,9 +2887,12 @@ class FurnitureProxy:
         except Exception:
             drawer_open_distance = 0.0
 
+        # One global FrontGap: half at each outer cabinet side,
+        # full gap between adjacent leaves/fronts.
+        side_gap = gap / 2.0
         available_width = (
             width
-            - 2.0 * gap
+            - gap
         )
 
         available_height = (
@@ -2816,12 +2931,12 @@ class FurnitureProxy:
         hinge_y = y_depth
 
         left_hinge_x = max(
-            gap,
+            side_gap,
             panel_t,
         )
 
         right_hinge_x = min(
-            width - gap,
+            width - side_gap,
             width - panel_t,
         )
 
@@ -2848,13 +2963,13 @@ class FurnitureProxy:
                     right_hinge_x
                     - available_width
                     if is_open_preview
-                    else gap
+                    else side_gap
                 )
             else:
                 panel_x = (
                     left_hinge_x
                     if is_open_preview
-                    else gap
+                    else side_gap
                 )
 
             panel = self._make_front_panel(
@@ -2900,9 +3015,9 @@ class FurnitureProxy:
                         - leaf_width
                     )
                 else:
-                    left_x = gap
+                    left_x = side_gap
                     right_x = (
-                        gap
+                        side_gap
                         + leaf_width
                         + gap
                     )
@@ -2957,26 +3072,20 @@ class FurnitureProxy:
                 ),
             )
 
-            drawer_height = (
-                available_height
-                - gap
-                * (
-                    count
-                    - 1
-                )
-            ) / count
+            sizes = drawer_heights(
+                available_height, count, gap,
+                getattr(obj, "DrawerHeightsJSON", "[]"),
+            )
 
-            if drawer_height > 0.001:
+            if sizes:
                 z = (
                     z_start
                     + gap
                 )
 
-                for _ in range(
-                    count
-                ):
+                for drawer_height in sizes:
                     panel = self._make_front_panel(
-                        gap,
+                        side_gap,
                         z,
                         available_width,
                         drawer_height,
@@ -3016,7 +3125,7 @@ class FurnitureProxy:
                 and door_height > 0.001
             ):
                 drawer = self._make_front_panel(
-                    gap,
+                    side_gap,
                     z_start
                     + gap
                     + door_height
@@ -3029,7 +3138,7 @@ class FurnitureProxy:
                 )
 
                 door = self._make_front_panel(
-                    gap,
+                    side_gap,
                     z_start + gap,
                     available_width,
                     door_height,
@@ -3050,7 +3159,7 @@ class FurnitureProxy:
         elif front_type == FRONT_LIFT_UP:
             # In 0.1 this is a single closed horizontal lift-up panel.
             panel = self._make_front_panel(
-                gap,
+                side_gap,
                 z_start + gap,
                 available_width,
                 available_height,
@@ -3750,7 +3859,11 @@ class FurnitureProxy:
             "SingleDoorHingeSide",
             "DrawerOpenDistance",
             "DrawerCount",
+            "DrawerHeightsJSON",
             "DrawerZoneHeight",
+            "TallZonesJSON",
+            "WallFrontDrop",
+            "ExtendedSides",
             "CornerOpeningWidth",
             "BlindSide",
             "BlindBoxWidth",
@@ -3786,6 +3899,7 @@ class FurnitureProxy:
             "SingleDoorHingeSide",
             "DrawerOpenDistance",
             "DrawerCount",
+            "DrawerHeightsJSON",
             "DrawerZoneHeight",
             "BlindSide",
             "BlindBoxWidth",
@@ -3828,17 +3942,9 @@ class FurnitureProxy:
         self,
         obj,
     ):
-        self._ensure_board_part_properties(
-            obj
-        )
-
-        self._update_board_parts(
-            obj
-        )
-
-        self._add_properties(
-            obj
-        )
+        self._add_properties(obj)
+        self._ensure_board_part_properties(obj)
+        self._update_board_parts(obj)
 
         obj.Proxy = self
 

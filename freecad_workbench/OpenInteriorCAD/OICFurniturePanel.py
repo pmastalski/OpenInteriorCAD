@@ -151,6 +151,12 @@ class FurniturePanel:
             self.rotation_input,
         )
 
+        self.placement_height_input = QtWidgets.QDoubleSpinBox()
+        self.placement_height_input.setRange(-10000.0, 10000.0)
+        self.placement_height_input.setDecimals(1)
+        self.placement_height_input.setSuffix(" mm")
+        self.placement_height_input.setValue(0.0)
+        dimensions_layout.addRow("Placement Height (Z):", self.placement_height_input)
         layout.addWidget(
             dimensions_group
         )
@@ -249,11 +255,13 @@ class FurniturePanel:
             depth=self.depth_input.value(),
             height=self.height_input.value(),
             rotation=self.rotation_input.value(),
+            placement_height=self.placement_height_input.value(),
         )
 
         self.status_label.setText(
-            "Click in the view where "
-            "the cabinet should be placed."
+            "Click a cabinet to snap to its left/right side at the specified "
+            "Placement Height (Z), including 0 mm; click empty space for "
+            "free placement."
         )
 
     def placement_finished(

@@ -1,5 +1,6 @@
 """Furniture commands for OpenInteriorCAD."""
 
+import math
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide import QtWidgets
@@ -118,6 +119,8 @@ class FurniturePlacementTool:
         self.depth = 600.0
         self.height = 850.0
         self.rotation = 0.0
+        self.placement_height = 0.0
+        self.snap_reference = None
 
         self.active = False
         self.waiting_for_point = False
@@ -158,6 +161,7 @@ class FurniturePlacementTool:
         depth,
         height,
         rotation,
+        placement_height=0.0,
     ):
         if not self.active:
             return
@@ -166,6 +170,9 @@ class FurniturePlacementTool:
         self.depth = depth
         self.height = height
         self.rotation = rotation
+        self.placement_height = placement_height
+        self.snap_reference = next((ob for ob in Gui.Selection.getSelection()
+            if getattr(ob, "OICType", "") == "OpenInteriorCAD::Furniture"), None)
 
         self._remove_callback()
 
@@ -219,11 +226,34 @@ class FurniturePlacementTool:
 
         self._remove_callback()
 
-        furniture_position = App.Vector(
-            point.x,
-            point.y,
-            0.0,
-        )
+        furniture_position = App.Vector(point.x, point.y, self.placement_height)
+        # Snap to an existing cabinet at EVERY placement height,
+        # including Z = 0. Prefer the cabinet under the cursor;
+        # otherwise use the cabinet selected before Pick Position.
+        reference = None
+        try:
+            hit = self.view.getObjectInfo(position)
+            if hit and hit.get("Object"):
+                candidate = self.document.getObject(hit["Object"])
+                if getattr(candidate, "OICType", "") == "OpenInteriorCAD::Furniture":
+                    reference = candidate
+        except Exception:
+            pass
+        if reference is None:
+            reference = self.snap_reference
+        if reference is not None:
+            angle = math.radians(reference.RotationAngle.Value)
+            dx = point.x - reference.Position.x
+            dy = point.y - reference.Position.y
+            local_x = dx * math.cos(angle) + dy * math.sin(angle)
+            to_right = local_x >= reference.Width.Value / 2.0
+            shift_x = reference.Width.Value if to_right else -self.width
+            furniture_position = App.Vector(
+                reference.Position.x + shift_x * math.cos(angle),
+                reference.Position.y + shift_x * math.sin(angle),
+                self.placement_height,
+            )
+            self.rotation = reference.RotationAngle.Value
 
         self.document.openTransaction(
             "Insert Cabinet"
