@@ -48,6 +48,7 @@ class OpenInteriorCADWorkbench(
 
         import OICFurnitureCommands
         import OICFurnitureEditableBodies
+        import OICBoardElementCommands
 
         # FreeCAD can retain an older development module in sys.modules.
         commands = Gui.listCommands()
@@ -105,6 +106,10 @@ class OpenInteriorCADWorkbench(
             "OIC_AddFurniture",
             "OIC_EditFurniture",
             "OIC_MoveFurniture",
+
+            # Standalone board elements
+            "OIC_AddFiller",
+            "OIC_EditFiller",
 
             # Dedicated snapping tools
             "OIC_SnapFurnitureWall",

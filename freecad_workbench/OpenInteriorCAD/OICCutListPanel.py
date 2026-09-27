@@ -23,6 +23,11 @@ from OICBoardParts import build_board_parts
 
 
 FURNITURE_TYPE = "OpenInteriorCAD::Furniture"
+BOARD_ELEMENT_TYPE = "OpenInteriorCAD::BoardElement"
+PRODUCTION_TYPES = {
+    FURNITURE_TYPE,
+    BOARD_ELEMENT_TYPE,
+}
 
 CATEGORY_CARCASS = "Carcass"
 CATEGORY_FRONTS = "Fronts"
@@ -44,7 +49,7 @@ def _selected_furniture():
             "OICType",
             "",
         )
-        == FURNITURE_TYPE
+        in PRODUCTION_TYPES
     ]
 
 
@@ -62,7 +67,7 @@ def _document_furniture():
             "OICType",
             "",
         )
-        == FURNITURE_TYPE
+        in PRODUCTION_TYPES
     ]
 
 

@@ -1674,7 +1674,74 @@ def _apply_edge_overrides(
     return parts
 
 
+def _board_element_parts(obj):
+    """Production metadata for a standalone filler / board element."""
+
+    height = _mm(getattr(obj, "Height", 0.0))
+    width = _mm(getattr(obj, "Width", 0.0))
+    thickness = _mm(getattr(obj, "Thickness", 0.0))
+
+    material = _text(
+        obj,
+        "BoardMaterial",
+        DEFAULT_BOARD_MATERIAL,
+    )
+    edge_material = _text(
+        obj,
+        "EdgeMaterial",
+        DEFAULT_EDGE_MATERIAL,
+    )
+    edge_thickness = _mm(
+        getattr(
+            obj,
+            "EdgeThickness",
+            0.8,
+        )
+    )
+
+    # Existing production convention:
+    # Front/Back run along Length; Left/Right run along Width.
+    #
+    # For a vertical filler we use:
+    #   Length = Height
+    #   Width  = panel Width
+    #
+    # Visible Top/Bottom edges therefore correspond to the short Width edges,
+    # while visible Left/Right correspond to the long Height edges.
+    #
+    # We store them in the existing four-edge schema as:
+    #   front = Left
+    #   back  = Right
+    #   left  = Top
+    #   right = Bottom
+    return [
+        _part(
+            str(
+                getattr(
+                    obj,
+                    "Label",
+                    "Filler",
+                )
+            ),
+            "Filler",
+            height,
+            width,
+            thickness,
+            material,
+            edge_material=edge_material,
+            edge_thickness=edge_thickness,
+            edge_front=bool(getattr(obj, "EdgeLeft", False)),
+            edge_back=bool(getattr(obj, "EdgeRight", False)),
+            edge_left=bool(getattr(obj, "EdgeTop", False)),
+            edge_right=bool(getattr(obj, "EdgeBottom", False)),
+        )
+    ]
+
+
 def build_board_parts(obj):
+    if getattr(obj, "OICType", "") == "OpenInteriorCAD::BoardElement":
+        return _board_element_parts(obj)
+
     cabinet_type = str(
         getattr(
             obj,
