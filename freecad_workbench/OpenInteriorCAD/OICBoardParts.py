@@ -225,7 +225,7 @@ def _standard_parts(obj):
 
     plinth = (
         _mm(obj.PlinthHeight)
-        if cabinet_type in ("Base", "Tall")
+        if cabinet_type in ("Base", "Tall", "Simple Corner Base")
         else 0.0
     )
 
@@ -497,6 +497,75 @@ def _standard_parts(obj):
                 )
             )
 
+    return parts
+
+
+def _simple_corner_parts(obj):
+    """Rectangular carcass, fixed left front, perpendicular filler, right door."""
+    parts = _standard_parts(obj)
+    W = _mm(obj.Width)
+    D = _mm(obj.Depth)
+    H = _mm(obj.Height)
+    T = _mm(obj.PanelThickness)
+    BT = _mm(obj.BackThickness)
+    P = _mm(obj.PlinthHeight)
+    F = max(0.0, _mm(obj.BlindFillerWidth))
+    B = _mm(obj.BlindBoxWidth)
+    opening_side = str(getattr(obj, "SimpleCornerOpeningSide", "Right"))
+    FT = _mm(obj.FrontThickness)
+    G = max(0.0, _mm(obj.FrontGap))
+    mats = _production_materials(obj)
+    board = mats["board"]
+    edge = mats["edge"]
+    et = mats["edge_thickness"]
+    # Remove the generic shelf/front lines; the accessible bay has its own
+    # narrower shelves and this construction has three distinct front parts.
+    parts = [p for p in parts if p.get("name") not in (
+        "Shelf", "Front", "Left Front", "Right Front",
+    ) and not str(p.get("name", "")).startswith("Drawer Front")]
+    parts.append(_part(
+        "Bay Partition", "Side", H-P-2*T, D-BT, T, board,
+        edge_material=edge, edge_thickness=et, edge_front=True,
+    ))
+    count = max(0, int(obj.ShelfCount))
+    shelf_w = W-B-2*T
+    if count and shelf_w > 0:
+        parts.append(_part(
+            ("Left Bay Shelf" if opening_side == "Left" else "Right Bay Shelf"),
+            "Shelf", shelf_w, D-BT, T, board,
+            quantity=count, edge_material=edge, edge_thickness=et,
+            edge_front=True,
+        ))
+    if str(obj.FrontType) != "Open":
+        front_h = H-P-2*G
+        fixed_w = B-G
+        door_w = W-B-G
+        for name, width in (
+            ("Fixed Right Front" if opening_side == "Left" else "Fixed Left Front", fixed_w),
+            ("Opening Left Front" if opening_side == "Left" else "Opening Right Front", door_w),
+        ):
+            if width > 0.001 and front_h > 0.001:
+                parts.append(_part(
+                    name, "Front", front_h, width, FT, mats["front"],
+                    edge_material=edge, edge_thickness=et,
+                    edge_front=True, edge_back=True,
+                    edge_left=True, edge_right=True,
+                ))
+        # Projection extends OUT from the closed front, so its length
+        # is not constrained by the cabinet's internal depth (D-BT).
+        if F > 0.001 and front_h > 0.001:
+            for filler_name in (
+                "Right Starting Filler 90°" if opening_side == "Left"
+                else "Left Starting Filler 90°",
+                "Corner Filler 90°",
+            ):
+                parts.append(_part(
+                    filler_name, "Filler",
+                    front_h, F, FT, mats["front"],
+                    edge_material=edge, edge_thickness=et,
+                    edge_front=True, edge_back=True,
+                    edge_left=True, edge_right=True,
+                ))
     return parts
 
 
@@ -1028,7 +1097,7 @@ def _corner_parts(obj):
 
     plinth = (
         _mm(obj.PlinthHeight)
-        if cabinet_type == "Corner Base"
+        if cabinet_type in ("Corner Base", "Simple Corner Base")
         else 0.0
     )
 
@@ -1275,7 +1344,7 @@ def _corner_parts(obj):
         )
     )
 
-    if front_type == "Corner Folding Doors":
+    if front_type == "Corner Folding Doors" or cabinet_type == "Simple Corner Base":
         FT = _mm(
             obj.FrontThickness
         )
@@ -1307,7 +1376,7 @@ def _corner_parts(obj):
         parts.extend(
             [
                 _part(
-                    "Front A",
+                    "Fixed Left Front" if cabinet_type == "Simple Corner Base" else "Front A",
                     "Front",
                     front_h,
                     front_a_len,
@@ -1325,7 +1394,7 @@ def _corner_parts(obj):
                     edge_right=True,
                 ),
                 _part(
-                    "Front B",
+                    "Opening Right Front" if cabinet_type == "Simple Corner Base" else "Front B",
                     "Front",
                     front_h,
                     front_b_len,
@@ -1580,6 +1649,8 @@ def build_board_parts(obj):
         parts = _corner_parts(
             obj
         )
+    elif cabinet_type == "Simple Corner Base":
+        parts = _simple_corner_parts(obj)
     elif cabinet_type == "Blind Corner Base":
         parts = _blind_corner_parts(
             obj

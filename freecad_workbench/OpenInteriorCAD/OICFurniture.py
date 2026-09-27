@@ -30,6 +30,7 @@ CABINET_TALL = "Tall"
 CABINET_CORNER_BASE = "Corner Base"
 CABINET_CORNER_WALL = "Corner Wall"
 CABINET_BLIND_CORNER_BASE = "Blind Corner Base"
+CABINET_SIMPLE_CORNER_BASE = "Simple Corner Base"
 
 GEOMETRY_BOX = "Box"
 GEOMETRY_CARCASS = "Carcass"
@@ -76,6 +77,7 @@ class FurnitureProxy:
         blind_mate_width=600.0,
         blind_mate_depth=600.0,
         blind_side="Left",
+        simple_corner_opening_side="Right",
         wall_front_drop=0.0,
         extended_sides="None",
     ):
@@ -113,6 +115,7 @@ class FurnitureProxy:
         obj.BlindMateWidth = blind_mate_width
         obj.BlindMateDepth = blind_mate_depth
         obj.BlindSide = blind_side
+        obj.SimpleCornerOpeningSide = simple_corner_opening_side
         obj.WallFrontDrop = wall_front_drop
         obj.ExtendedSides = extended_sides
 
@@ -173,6 +176,7 @@ class FurnitureProxy:
                 CABINET_CORNER_BASE,
                 CABINET_CORNER_WALL,
                 CABINET_BLIND_CORNER_BASE,
+                CABINET_SIMPLE_CORNER_BASE,
             ]
 
             obj.CabinetType = allowed
@@ -357,6 +361,24 @@ class FurnitureProxy:
                 obj.BlindSide = current_blind_side
             else:
                 obj.BlindSide = "Left"
+
+        # Separate property from BlindSide: existing Simple Corner Base
+        # cabinets previously opened on the right irrespective of BlindSide.
+        # Missing property on old documents therefore defaults to Right.
+        simple_side_exists = "SimpleCornerOpeningSide" in obj.PropertiesList
+        simple_side_previous = (
+            str(obj.SimpleCornerOpeningSide) if simple_side_exists else "Right"
+        )
+        add(
+            "App::PropertyEnumeration",
+            "SimpleCornerOpeningSide",
+            "Simple Corner",
+            "Opening door side: Right or Left. Mirrors the fixed bay, shelves and both 90-degree fillers.",
+        )
+        obj.SimpleCornerOpeningSide = ["Right", "Left"]
+        obj.SimpleCornerOpeningSide = (
+            simple_side_previous if simple_side_previous in ("Right", "Left") else "Right"
+        )
 
         add(
             "App::PropertyLength",
@@ -2688,6 +2710,136 @@ class FurnitureProxy:
         ]
 
 
+    def _make_simple_corner_carcass(self, obj):
+        """Straight rectangular cabinet with a fixed bay opposite the opening.
+
+        Unlike Corner Base this does NOT use the L-shaped footprint and
+        unlike Blind Corner Base it does NOT create a perpendicular mate.
+        The outer MDF back overlays the carcass, as on standard cabinets.
+        """
+        W = float(obj.Width.Value)
+        D = float(obj.Depth.Value)
+        H = float(obj.Height.Value)
+        T = float(obj.PanelThickness.Value)
+        BT = float(obj.BackThickness.Value)
+        P = max(0.0, float(obj.PlinthHeight.Value))
+        B = float(obj.BlindBoxWidth.Value)
+        opening_side = str(getattr(obj, "SimpleCornerOpeningSide", "Right"))
+        if min(W, D, H, T, BT, B) <= 0.001 or (W - B - 2 * T <= 100.0):
+            return Part.Shape()
+        body_h = H - P
+        inside_d = D - BT
+        clear_h = body_h - 2*T
+        if min(body_h, inside_d, clear_h) <= 0.001:
+            return Part.Shape()
+        shapes = [
+            Part.makeBox(T, inside_d, body_h, App.Vector(0, BT, P)),
+            Part.makeBox(T, inside_d, body_h, App.Vector(W-T, BT, P)),
+            Part.makeBox(W-2*T, inside_d, T, App.Vector(T, BT, P)),
+            Part.makeBox(W-2*T, inside_d, T, App.Vector(T, BT, H-T)),
+            Part.makeBox(W, BT, body_h, App.Vector(0, 0, P)),
+            # Partition mirrors with the fixed bay. Right-opening: at B;
+            # left-opening: at W-B-T. B remains the FIXED bay width.
+            Part.makeBox(
+                T, inside_d, clear_h,
+                App.Vector(B if opening_side == "Right" else W-B-T, BT, P+T),
+            ),
+        ]
+        shelf_w = W - B - 2*T
+        count = max(0, int(obj.ShelfCount))
+        if count and shelf_w > 0:
+            free_h = clear_h-count*T
+            if free_h > 0:
+                pitch = free_h/(count+1)
+                for index in range(count):
+                    z = P+T+pitch+(pitch+T)*index
+                    shelf_x = B+T if opening_side == "Right" else T
+                    shapes.append(Part.makeBox(
+                        shelf_w, inside_d, T, App.Vector(shelf_x, BT, z),
+                    ))
+        if P > 0.001:
+            setback = max(0.0, float(obj.PlinthSetback.Value))
+            plinth_y = max(0.0, min(D-T, D-setback-T))
+            shapes.append(Part.makeBox(W, T, P, App.Vector(0, plinth_y, 0)))
+        return Part.makeCompound(shapes)
+
+    def _make_simple_corner_front_geometry(self, obj):
+        """Straight carcass with two outward 90-degree fillers and one door.
+
+        The opening side mirrors all front components across local X=W/2.
+        Both perpendicular fillers protrude OUT from the front toward +Y.
+        They start at the outside face of the closed front (D + ft), so
+        neither intersects the fixed panel or opening right door.
+        No L-shaped footprint or second cabinet.
+        """
+        if str(obj.FrontType) == FRONT_OPEN:
+            return []
+
+        W = float(obj.Width.Value)
+        D = float(obj.Depth.Value)
+        H = float(obj.Height.Value)
+        B = float(obj.BlindBoxWidth.Value)
+        opening_side = str(getattr(obj, "SimpleCornerOpeningSide", "Right"))
+        F = max(0.0, float(obj.BlindFillerWidth.Value))
+        ft = max(0.01, float(obj.FrontThickness.Value))
+        gap = max(0.0, float(obj.FrontGap.Value))
+        plinth = max(0.0, float(obj.PlinthHeight.Value))
+        front_z = plinth + gap
+        front_h = H - plinth - 2.0 * gap
+
+        # The fillers START at the front panel's OUTER face and project
+        # outward into the room (+Y); Y=0 is the wall/rear of this cabinet.
+        # B always denotes the fixed-bay width, regardless of its side.
+        # Both variants have the same cut sizes and are exact X mirrors.
+        fixed_w = B - gap
+        door_w = W - B - gap
+        if opening_side == "Left":
+            fixed_x = W - B + gap / 2.0
+            door_x = gap / 2.0
+        else:
+            fixed_x = gap / 2.0
+            door_x = B + gap / 2.0
+
+        if min(fixed_w, door_w, front_h) <= 0.01:
+            return []
+
+        shapes = [Part.makeBox(
+            fixed_w, ft, front_h,
+            App.Vector(fixed_x, D, front_z),
+        )]
+        if F > 0.001:
+            # Both fillers protrude TOWARD THE ROOM from the outer face
+            # of the front. Local +Y is outward, local 0 is rear/wall.
+            # Start after front thickness to avoid overlapping front solids.
+            # Exact mirror: starting edge and internal division are on the
+            # fixed-bay side. Independent solids for Editable Bodies/Cut List.
+            projection_start_y = D + ft
+            if opening_side == "Left":
+                filler_positions = (W - ft, W - B)
+            else:
+                filler_positions = (0.0, B - ft)
+            for filler_x in filler_positions:
+                shapes.append(Part.makeBox(
+                    ft, F, front_h,
+                    App.Vector(filler_x, projection_start_y, front_z),
+                ))
+
+        door = Part.makeBox(
+            door_w, ft, front_h,
+            App.Vector(door_x, D, front_z),
+        )
+        angle = max(0.0, min(110.0, float(obj.FrontOpenAngle.Value)))
+        if angle > 0.0001:
+            if opening_side == "Left":
+                hinge_x, opening_angle = gap / 2.0, angle
+            else:
+                hinge_x, opening_angle = W - gap / 2.0, -angle
+            hinge = App.Vector(hinge_x, D + ft, 0.0)
+            door.rotate(hinge, App.Vector(0, 0, 1), opening_angle)
+        shapes.append(door)
+        return shapes
+
+
     def _rotate_front_leaf(
         self,
         shape,
@@ -2829,6 +2981,9 @@ class FurnitureProxy:
             return self._make_corner_front_geometry(
                 obj
             )
+
+        if cabinet_type == CABINET_SIMPLE_CORNER_BASE:
+            return self._make_simple_corner_front_geometry(obj)
 
         if cabinet_type == CABINET_BLIND_CORNER_BASE:
             return self._make_blind_corner_front_geometry(
@@ -3205,6 +3360,9 @@ class FurnitureProxy:
                 obj,
                 use_plinth=False,
             )
+
+        if cabinet_type == CABINET_SIMPLE_CORNER_BASE:
+            return self._make_simple_corner_carcass(obj)
 
         if cabinet_type == CABINET_BLIND_CORNER_BASE:
             return self._make_blind_corner_carcass(
@@ -3866,6 +4024,7 @@ class FurnitureProxy:
             "ExtendedSides",
             "CornerOpeningWidth",
             "BlindSide",
+            "SimpleCornerOpeningSide",
             "BlindBoxWidth",
             "BlindFillerWidth",
             "BlindDoorFillerWidth",
@@ -3902,6 +4061,7 @@ class FurnitureProxy:
             "DrawerHeightsJSON",
             "DrawerZoneHeight",
             "BlindSide",
+            "SimpleCornerOpeningSide",
             "BlindBoxWidth",
             "BlindFillerWidth",
             "BlindDoorFillerWidth",
@@ -4160,6 +4320,7 @@ def create_furniture(
     blind_mate_width=600.0,
     blind_mate_depth=600.0,
     blind_side="Left",
+    simple_corner_opening_side="Right",
 ):
     """Create one universal Cabinet object."""
 
@@ -4199,6 +4360,7 @@ def create_furniture(
         blind_mate_width=blind_mate_width,
         blind_mate_depth=blind_mate_depth,
         blind_side=blind_side,
+        simple_corner_opening_side=simple_corner_opening_side,
     )
 
     FurnitureViewProvider(

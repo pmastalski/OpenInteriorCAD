@@ -85,6 +85,7 @@ def duplicate_furniture(
         "blind_mate_width": "BlindMateWidth",
         "blind_mate_depth": "BlindMateDepth",
         "blind_side": "BlindSide",
+        "simple_corner_opening_side": "SimpleCornerOpeningSide",
     }
 
     for argument, property_name in mapping.items():
@@ -101,6 +102,7 @@ def duplicate_furniture(
             "GeometryMode",
             "FrontType",
             "BlindSide",
+            "SimpleCornerOpeningSide",
         }:
             kwargs[argument] = str(
                 value

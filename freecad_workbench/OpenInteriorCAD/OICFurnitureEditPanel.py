@@ -15,6 +15,7 @@ from OICFurniture import (
     CABINET_CORNER_BASE,
     CABINET_CORNER_WALL,
     CABINET_BLIND_CORNER_BASE,
+    CABINET_SIMPLE_CORNER_BASE,
     GEOMETRY_BOX,
     GEOMETRY_CARCASS,
     FRONT_OPEN,
@@ -115,6 +116,7 @@ class FurnitureEditPanel:
                 CABINET_CORNER_BASE,
                 CABINET_CORNER_WALL,
                 CABINET_BLIND_CORNER_BASE,
+                CABINET_SIMPLE_CORNER_BASE,
             ]
         )
 
@@ -375,6 +377,7 @@ class FurnitureEditPanel:
             True
         )
 
+        self.blind_help_label = blind_help
         blind_layout.addRow(
             blind_help
         )
@@ -847,11 +850,16 @@ class FurnitureEditPanel:
                 self.furniture.DepthB.Value
             )
 
-            if "BlindSide" in self.furniture.PropertiesList:
+            if (
+                str(self.furniture.CabinetType) == CABINET_SIMPLE_CORNER_BASE
+                and "SimpleCornerOpeningSide" in self.furniture.PropertiesList
+            ):
                 self.blind_side_combo.setCurrentText(
-                    str(
-                        self.furniture.BlindSide
-                    )
+                    str(self.furniture.SimpleCornerOpeningSide)
+                )
+            elif "BlindSide" in self.furniture.PropertiesList:
+                self.blind_side_combo.setCurrentText(
+                    str(self.furniture.BlindSide)
                 )
 
             if "BlindBoxWidth" in self.furniture.PropertiesList:
@@ -988,8 +996,47 @@ class FurnitureEditPanel:
             is_corner
         )
 
-        self.blind_group.setVisible(
-            is_blind
+        is_simple = cabinet_type == CABINET_SIMPLE_CORNER_BASE
+        self.blind_group.setVisible(is_blind or is_simple)
+        self.blind_group.setTitle(
+            "Straight Corner - Left / Right Opening" if is_simple
+            else "Blind Corner"
+        )
+        # For Simple Corner show opening side, never Blind Corner mate options.
+        self.blind_side_combo.setVisible(is_blind or is_simple)
+        side_label = self.blind_group.layout().labelForField(self.blind_side_combo)
+        if side_label is not None:
+            side_label.setVisible(is_blind or is_simple)
+            side_label.setText("Opening Side:" if is_simple else "Hidden Side:")
+        for widget in (
+            self.blind_door_filler_width_input,
+            self.blind_mate_width_input,
+            self.blind_mate_depth_input,
+            self.ensure_mate_button,
+        ):
+            widget.setVisible(is_blind)
+            label = self.blind_group.layout().labelForField(widget)
+            if label is not None:
+                label.setVisible(is_blind)
+        for widget in (self.blind_box_width_input, self.blind_filler_width_input):
+            label = self.blind_group.layout().labelForField(widget)
+            if label is not None:
+                label.setText(
+                    "Fixed Section Width:" if widget is self.blind_box_width_input
+                    else "Both 90° Fillers Projection:"
+                ) if is_simple else label.setText(
+                    "Blind Box Width:" if widget is self.blind_box_width_input
+                    else "Corner Spacer Width:"
+                )
+        self.blind_help_label.setText(
+            "ONE rectangular cabinet; select Opening Side = Right / Left. "
+            "The fixed section stays opposite the opening door, and BOTH "
+            "90° fillers mirror to its side: at the outer edge and the "
+            "fixed-panel/door corner. Both project OUTWARD toward the room. "
+            "Fixed Section Width stays the same when mirrored. No second cabinet."
+            if is_simple else
+            "Corner Spacer Width is the gap between the long blind cabinet "
+            "and its linked 90-degree cabinet."
         )
 
         self.tall_group.setVisible(cabinet_type == CABINET_TALL)
@@ -1014,7 +1061,8 @@ class FurnitureEditPanel:
         self.front_group.setEnabled(True)
 
         self._refresh_front_type_options(
-            is_corner
+            is_corner,
+            is_simple=(cabinet_type == CABINET_SIMPLE_CORNER_BASE),
         )
 
         if is_corner:
@@ -1047,6 +1095,7 @@ class FurnitureEditPanel:
     def _refresh_front_type_options(
         self,
         is_corner,
+        is_simple=False,
     ):
         """Show only front systems valid for the selected cabinet type."""
 
@@ -1054,7 +1103,9 @@ class FurnitureEditPanel:
             self.front_type_combo.currentText()
         )
 
-        if is_corner:
+        if is_simple:
+            options = [FRONT_SINGLE]
+        elif is_corner:
             options = [
                 FRONT_OPEN,
                 FRONT_CORNER_FOLDING,
@@ -1514,6 +1565,17 @@ class FurnitureEditPanel:
 
         if (
             not self._updating
+            and self.type_combo.currentText() == CABINET_SIMPLE_CORNER_BASE
+        ):
+            if self.width_input.value() < 900.0:
+                self.width_input.setValue(1200.0)
+            if self.blind_box_width_input.value() <= 0.0:
+                self.blind_box_width_input.setValue(600.0)
+            if self.blind_filler_width_input.value() <= 0.0:
+                self.blind_filler_width_input.setValue(50.0)
+
+        if (
+            not self._updating
             and self.type_combo.currentText()
             == CABINET_BLIND_CORNER_BASE
         ):
@@ -1548,6 +1610,24 @@ class FurnitureEditPanel:
                 self.blind_mate_depth_input.setValue(
                     600.0
                 )
+
+        # The two cabinet types have independent side settings. Loading the
+        # correct one also prevents the Blind Corner choice from silently
+        # switching the newly selected Simple Corner (and vice versa).
+        selected_type = self.type_combo.currentText()
+        if selected_type in (CABINET_SIMPLE_CORNER_BASE, CABINET_BLIND_CORNER_BASE):
+            side_property = (
+                "SimpleCornerOpeningSide" if selected_type == CABINET_SIMPLE_CORNER_BASE
+                else "BlindSide"
+            )
+            if side_property in self.furniture.PropertiesList:
+                self.blind_side_combo.blockSignals(True)
+                try:
+                    self.blind_side_combo.setCurrentText(
+                        str(getattr(self.furniture, side_property))
+                    )
+                finally:
+                    self.blind_side_combo.blockSignals(False)
 
         self._update_type_ui()
         self._values_changed()
@@ -1592,10 +1672,18 @@ class FurnitureEditPanel:
                 self.depth_b_input.value()
             )
 
-            if "BlindSide" in self.furniture.PropertiesList:
-                self.furniture.BlindSide = (
+            if (
+                self.type_combo.currentText() == CABINET_SIMPLE_CORNER_BASE
+                and "SimpleCornerOpeningSide" in self.furniture.PropertiesList
+            ):
+                self.furniture.SimpleCornerOpeningSide = (
                     self.blind_side_combo.currentText()
                 )
+            elif (
+                self.type_combo.currentText() == CABINET_BLIND_CORNER_BASE
+                and "BlindSide" in self.furniture.PropertiesList
+            ):
+                self.furniture.BlindSide = self.blind_side_combo.currentText()
 
             if "BlindBoxWidth" in self.furniture.PropertiesList:
                 self.furniture.BlindBoxWidth = (
