@@ -86,6 +86,9 @@ def duplicate_furniture(
         "blind_mate_depth": "BlindMateDepth",
         "blind_side": "BlindSide",
         "simple_corner_opening_side": "SimpleCornerOpeningSide",
+        "top_reinforcement_mode": "TopReinforcementMode",
+        "top_reinforcement_size": "TopReinforcementSize",
+        "show_lower_plinth": "ShowLowerPlinth",
     }
 
     for argument, property_name in mapping.items():
@@ -103,6 +106,7 @@ def duplicate_furniture(
             "FrontType",
             "BlindSide",
             "SimpleCornerOpeningSide",
+            "TopReinforcementMode",
         }:
             kwargs[argument] = str(
                 value
@@ -115,6 +119,9 @@ def duplicate_furniture(
             kwargs[argument] = int(
                 value
             )
+
+        elif property_name == "ShowLowerPlinth":
+            kwargs[argument] = bool(value)
 
         else:
             kwargs[argument] = (

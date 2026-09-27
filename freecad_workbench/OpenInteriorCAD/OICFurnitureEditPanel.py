@@ -36,6 +36,8 @@ class FurnitureEditPanel:
     ):
         self.furniture = furniture
         self._updating = False
+        self._selection_observer_installed = False
+        self._switching_furniture = False
         self._drawer_custom = decode_drawers(
             str(getattr(furniture, "DrawerHeightsJSON", "[]"))
         )
@@ -49,6 +51,7 @@ class FurnitureEditPanel:
         self._load_values()
         self._update_type_ui()
         self._update_front_ui()
+        self._install_selection_observer()
 
     def _length_spin(
         self,
@@ -473,6 +476,32 @@ class FurnitureEditPanel:
         self.extended_sides_label = QtWidgets.QLabel("Floor-reaching Sides:")
         carcass_layout.addRow(self.extended_sides_label, self.extended_sides_combo)
 
+        self.top_reinforcement_mode_combo = QtWidgets.QComboBox()
+        self.top_reinforcement_mode_combo.addItems(["Horizontal", "Vertical"])
+        self.top_reinforcement_mode_label = QtWidgets.QLabel("Top Reinforcements:")
+        carcass_layout.addRow(
+            self.top_reinforcement_mode_label,
+            self.top_reinforcement_mode_combo,
+        )
+
+        self.top_reinforcement_size_input = self._length_spin(18.0, 500.0)
+        self.top_reinforcement_size_label = QtWidgets.QLabel("Reinforcement Size:")
+        self.top_reinforcement_size_input.setToolTip(
+            "Horizontal: rail depth. Vertical: rail height."
+        )
+        carcass_layout.addRow(
+            self.top_reinforcement_size_label,
+            self.top_reinforcement_size_input,
+        )
+
+        self.show_lower_plinth_check = QtWidgets.QCheckBox("Generate lower plinth / bottom filler")
+        self.show_lower_plinth_check.setChecked(True)
+        self.show_lower_plinth_label = QtWidgets.QLabel("Lower Plinth:")
+        carcass_layout.addRow(
+            self.show_lower_plinth_label,
+            self.show_lower_plinth_check,
+        )
+
         carcass_layout.addRow(
             "Panel Thickness:",
             self.panel_input,
@@ -729,10 +758,46 @@ class FurnitureEditPanel:
             position_group
         )
 
-        close_button = (
-            QtWidgets.QPushButton(
-                "Close"
-            )
+        navigation_group = QtWidgets.QGroupBox(
+            "Cabinet Selection"
+        )
+        navigation_layout = QtWidgets.QVBoxLayout(
+            navigation_group
+        )
+
+        navigation_help = QtWidgets.QLabel(
+            "The editor stays open. Click another OpenInteriorCAD cabinet "
+            "in the 3D view or Model tree to edit it immediately."
+        )
+        navigation_help.setWordWrap(True)
+        navigation_layout.addWidget(navigation_help)
+
+        navigation_buttons = QtWidgets.QHBoxLayout()
+        self.previous_cabinet_button = QtWidgets.QPushButton(
+            "Previous Cabinet"
+        )
+        self.next_cabinet_button = QtWidgets.QPushButton(
+            "Next Cabinet"
+        )
+        navigation_buttons.addWidget(
+            self.previous_cabinet_button
+        )
+        navigation_buttons.addWidget(
+            self.next_cabinet_button
+        )
+        navigation_layout.addLayout(
+            navigation_buttons
+        )
+
+        layout.addWidget(
+            navigation_group
+        )
+
+        close_button = QtWidgets.QPushButton(
+            "Close Editor"
+        )
+        close_button.setToolTip(
+            "Close only the editor. Parameter changes are applied immediately."
         )
 
         layout.addWidget(
@@ -749,6 +814,9 @@ class FurnitureEditPanel:
         self.tall_auto_button.clicked.connect(self._tall_auto_height)
         self.tall_drawer_button.clicked.connect(self._edit_tall_drawers)
         self.extended_sides_combo.currentTextChanged.connect(self._values_changed)
+        self.top_reinforcement_mode_combo.currentTextChanged.connect(self._values_changed)
+        self.top_reinforcement_size_input.valueChanged.connect(self._values_changed)
+        self.show_lower_plinth_check.toggled.connect(self._values_changed)
 
         # SIGNALS
         self.type_combo.currentTextChanged.connect(
@@ -808,9 +876,220 @@ class FurnitureEditPanel:
             self._apply_mount_height
         )
 
-        close_button.clicked.connect(
-            Gui.Control.closeDialog
+        self.previous_cabinet_button.clicked.connect(
+            lambda: self._select_relative_cabinet(-1)
         )
+        self.next_cabinet_button.clicked.connect(
+            lambda: self._select_relative_cabinet(1)
+        )
+
+        close_button.clicked.connect(
+            self._close_editor
+        )
+
+    def _install_selection_observer(
+        self,
+    ):
+        if self._selection_observer_installed:
+            return
+
+        try:
+            Gui.Selection.addObserver(
+                self
+            )
+            self._selection_observer_installed = True
+        except Exception as error:
+            App.Console.PrintWarning(
+                "OpenInteriorCAD selection observer warning: "
+                f"{error}\n"
+            )
+
+    def _remove_selection_observer(
+        self,
+    ):
+        if not self._selection_observer_installed:
+            return
+
+        try:
+            Gui.Selection.removeObserver(
+                self
+            )
+        except Exception:
+            pass
+
+        self._selection_observer_installed = False
+
+    def addSelection(
+        self,
+        document_name,
+        object_name,
+        sub_name="",
+        point=None,
+    ):
+        """FreeCAD selection observer: switch editor to a clicked cabinet."""
+
+        if (
+            self._updating
+            or self._switching_furniture
+        ):
+            return
+
+        try:
+            document = App.getDocument(
+                document_name
+            )
+            selected = document.getObject(
+                object_name
+            )
+        except Exception:
+            return
+
+        if (
+            selected is None
+            or getattr(
+                selected,
+                "OICType",
+                "",
+            )
+            != "OpenInteriorCAD::Furniture"
+            or selected is self.furniture
+        ):
+            return
+
+        self._switch_furniture(
+            selected
+        )
+
+    def removeSelection(
+        self,
+        document_name,
+        object_name,
+        sub_name="",
+    ):
+        # Clearing selection must not close the editor or forget the current
+        # cabinet. A switch happens only when another cabinet is selected.
+        return
+
+    def clearSelection(
+        self,
+        document_name="",
+    ):
+        return
+
+    def setSelection(
+        self,
+        document_name="",
+    ):
+        return
+
+    def _switch_furniture(
+        self,
+        furniture,
+    ):
+        if (
+            furniture is None
+            or furniture is self.furniture
+            or getattr(
+                furniture,
+                "OICType",
+                "",
+            )
+            != "OpenInteriorCAD::Furniture"
+        ):
+            return
+
+        self._switching_furniture = True
+
+        try:
+            # Every ordinary field is already written live by
+            # _values_changed(). Keep the per-cabinet drawer data in sync
+            # before loading the next object.
+            self.furniture = furniture
+            self._drawer_custom = decode_drawers(
+                str(
+                    getattr(
+                        furniture,
+                        "DrawerHeightsJSON",
+                        "[]",
+                    )
+                )
+            )
+
+            self._load_values()
+            self._update_type_ui()
+            self._update_front_ui()
+
+            self.form.setWindowTitle(
+                f"Edit Furniture - {furniture.Label}"
+            )
+
+        finally:
+            self._switching_furniture = False
+
+    def _document_cabinets(
+        self,
+    ):
+        document = getattr(
+            self.furniture,
+            "Document",
+            None,
+        )
+
+        if document is None:
+            return []
+
+        return [
+            obj
+            for obj in document.Objects
+            if getattr(
+                obj,
+                "OICType",
+                "",
+            )
+            == "OpenInteriorCAD::Furniture"
+        ]
+
+    def _select_relative_cabinet(
+        self,
+        direction,
+    ):
+        cabinets = self._document_cabinets()
+
+        if not cabinets:
+            return
+
+        try:
+            index = cabinets.index(
+                self.furniture
+            )
+        except ValueError:
+            index = 0
+
+        target = cabinets[
+            (index + direction)
+            % len(cabinets)
+        ]
+
+        self._switch_furniture(
+            target
+        )
+
+        # Keep FreeCAD's Model tree / 3D selection synchronized with the
+        # cabinet shown in the editor.
+        self._switching_furniture = True
+        try:
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(
+                target
+            )
+        finally:
+            self._switching_furniture = False
+
+    def _close_editor(
+        self,
+    ):
+        self._remove_selection_observer()
+        Gui.Control.closeDialog()
 
     def _load_values(
         self,
@@ -819,7 +1098,11 @@ class FurnitureEditPanel:
 
         try:
             self.info_label.setText(
-                f"<b>{self.furniture.Label}</b>"
+                f"<b>{self.furniture.Label}</b><br>"
+                "Changes are applied immediately."
+            )
+            self.form.setWindowTitle(
+                f"Edit Furniture - {self.furniture.Label}"
             )
 
             self.type_combo.setCurrentText(
@@ -948,6 +1231,15 @@ class FurnitureEditPanel:
             )
             self.wall_front_drop_input.setValue(float(getattr(self.furniture, "WallFrontDrop", 0.0)))
             self.extended_sides_combo.setCurrentText(str(getattr(self.furniture, "ExtendedSides", "None")))
+            self.top_reinforcement_mode_combo.setCurrentText(
+                str(getattr(self.furniture, "TopReinforcementMode", "Horizontal"))
+            )
+            self.top_reinforcement_size_input.setValue(
+                float(getattr(self.furniture, "TopReinforcementSize", 100.0))
+            )
+            self.show_lower_plinth_check.setChecked(
+                bool(getattr(self.furniture, "ShowLowerPlinth", True))
+            )
 
             self.drawer_count_input.setValue(
                 int(
@@ -1043,6 +1335,21 @@ class FurnitureEditPanel:
         can_extend = cabinet_type in (CABINET_BASE, CABINET_TALL)
         self.extended_sides_combo.setVisible(can_extend)
         self.extended_sides_label.setVisible(can_extend)
+
+        is_base = cabinet_type == CABINET_BASE
+        self.top_reinforcement_mode_combo.setVisible(is_base)
+        self.top_reinforcement_mode_label.setVisible(is_base)
+        self.top_reinforcement_size_input.setVisible(is_base)
+        self.top_reinforcement_size_label.setVisible(is_base)
+
+        floor_standing = cabinet_type in (
+            CABINET_BASE,
+            CABINET_TALL,
+            CABINET_SIMPLE_CORNER_BASE,
+        )
+        self.show_lower_plinth_check.setVisible(floor_standing)
+        self.show_lower_plinth_label.setVisible(floor_standing)
+
         self.wall_front_drop_input.setVisible(cabinet_type == CABINET_WALL)
         self.wall_front_drop_label.setVisible(cabinet_type == CABINET_WALL)
 
@@ -1761,6 +2068,18 @@ class FurnitureEditPanel:
             )
             self.furniture.WallFrontDrop = self.wall_front_drop_input.value()
             self.furniture.ExtendedSides = self.extended_sides_combo.currentText()
+            if "TopReinforcementMode" in self.furniture.PropertiesList:
+                self.furniture.TopReinforcementMode = (
+                    self.top_reinforcement_mode_combo.currentText()
+                )
+            if "TopReinforcementSize" in self.furniture.PropertiesList:
+                self.furniture.TopReinforcementSize = (
+                    self.top_reinforcement_size_input.value()
+                )
+            if "ShowLowerPlinth" in self.furniture.PropertiesList:
+                self.furniture.ShowLowerPlinth = (
+                    self.show_lower_plinth_check.isChecked()
+                )
 
             if "DrawerHeightsJSON" in self.furniture.PropertiesList:
                 self.furniture.DrawerHeightsJSON = json.dumps(self._drawer_custom)
@@ -1818,9 +2137,11 @@ class FurnitureEditPanel:
     def accept(
         self,
     ):
+        self._remove_selection_observer()
         return True
 
     def reject(
         self,
     ):
+        self._remove_selection_observer()
         return True

@@ -80,6 +80,9 @@ class FurnitureProxy:
         simple_corner_opening_side="Right",
         wall_front_drop=0.0,
         extended_sides="None",
+        top_reinforcement_mode="Horizontal",
+        top_reinforcement_size=100.0,
+        show_lower_plinth=True,
     ):
         self._add_properties(obj)
         obj.Proxy = self
@@ -118,6 +121,9 @@ class FurnitureProxy:
         obj.SimpleCornerOpeningSide = simple_corner_opening_side
         obj.WallFrontDrop = wall_front_drop
         obj.ExtendedSides = extended_sides
+        obj.TopReinforcementMode = top_reinforcement_mode
+        obj.TopReinforcementSize = top_reinforcement_size
+        obj.ShowLowerPlinth = bool(show_lower_plinth)
 
         if cabinet_type == CABINET_TALL and height >= 1750.0:
             obj.TallZonesJSON = __import__("json").dumps(example_zones())
@@ -136,6 +142,47 @@ class FurnitureProxy:
         previous_extended = str(obj.ExtendedSides)
         obj.ExtendedSides = ["None", "Left", "Right", "Both"]
         obj.ExtendedSides = previous_extended if previous_extended in ("None", "Left", "Right", "Both") else "None"
+
+        add(
+            "App::PropertyEnumeration",
+            "TopReinforcementMode",
+            "Carcass",
+            "Base cabinet top: two horizontal or two vertical reinforcement rails.",
+        )
+        if "TopReinforcementMode" in obj.PropertiesList:
+            try:
+                previous_top_mode = str(obj.TopReinforcementMode)
+            except Exception:
+                previous_top_mode = "Horizontal"
+            obj.TopReinforcementMode = ["Horizontal", "Vertical"]
+            obj.TopReinforcementMode = (
+                previous_top_mode
+                if previous_top_mode in ("Horizontal", "Vertical")
+                else "Horizontal"
+            )
+
+        add(
+            "App::PropertyLength",
+            "TopReinforcementSize",
+            "Carcass",
+            "Depth of horizontal rails or height of vertical rails.",
+        )
+        if obj.TopReinforcementSize.Value <= 0.0:
+            obj.TopReinforcementSize = 100.0
+
+        add(
+            "App::PropertyBool",
+            "ShowLowerPlinth",
+            "Carcass",
+            "Generate the lower front plinth / bottom filler.",
+        )
+        # New cabinets default to True. Restored older documents also receive
+        # a sensible visible plinth unless the user explicitly disables it.
+        if "ShowLowerPlinth" in obj.PropertiesList:
+            try:
+                bool(obj.ShowLowerPlinth)
+            except Exception:
+                obj.ShowLowerPlinth = True
         add(
             "App::PropertyString",
             "DrawerHeightsJSON",
@@ -691,20 +738,6 @@ class FurnitureProxy:
                 ),
             ),
 
-            # Top.
-            Part.makeBox(
-                inner_width,
-                inner_depth,
-                panel,
-                App.Vector(
-                    panel,
-                    back,
-                    plinth
-                    + body_height
-                    - panel,
-                ),
-            ),
-
             # Full-overlay glued-on MDF back: outer width and whole
             # carcass height.  No grooves or inset into the side panels.
             Part.makeBox(
@@ -718,6 +751,67 @@ class FurnitureProxy:
                 ),
             ),
         ]
+
+        # Base cabinets use two reinforcement rails instead of a complete
+        # top panel. Horizontal = flat strips at front/back. Vertical =
+        # upright strips, useful e.g. under a sink where the centre must stay
+        # completely open for the bowl and plumbing.
+        cabinet_type = str(obj.CabinetType)
+        if cabinet_type == CABINET_BASE:
+            rail_size = max(
+                panel,
+                min(
+                    float(obj.TopReinforcementSize.Value),
+                    inner_depth / 2.0,
+                ),
+            )
+            top_z = plinth + body_height
+
+            if str(obj.TopReinforcementMode) == "Vertical":
+                rail_height = max(
+                    panel,
+                    min(
+                        float(obj.TopReinforcementSize.Value),
+                        body_height,
+                    ),
+                )
+                rail_z = top_z - rail_height
+                shapes.extend([
+                    Part.makeBox(
+                        inner_width, panel, rail_height,
+                        App.Vector(panel, back, rail_z),
+                    ),
+                    Part.makeBox(
+                        inner_width, panel, rail_height,
+                        App.Vector(panel, back + inner_depth - panel, rail_z),
+                    ),
+                ])
+            else:
+                rail_z = top_z - panel
+                shapes.extend([
+                    Part.makeBox(
+                        inner_width, rail_size, panel,
+                        App.Vector(panel, back, rail_z),
+                    ),
+                    Part.makeBox(
+                        inner_width, rail_size, panel,
+                        App.Vector(panel, back + inner_depth - rail_size, rail_z),
+                    ),
+                ])
+        else:
+            # Wall and Tall cabinets keep the complete top board.
+            shapes.append(
+                Part.makeBox(
+                    inner_width,
+                    inner_depth,
+                    panel,
+                    App.Vector(
+                        panel,
+                        back,
+                        plinth + body_height - panel,
+                    ),
+                )
+            )
 
         tall_zones = (
             tall_zone_layout(
@@ -789,6 +883,7 @@ class FurnitureProxy:
         if (
             use_plinth
             and plinth > 0.001
+            and bool(getattr(obj, "ShowLowerPlinth", True))
         ):
             setback = max(
                 0.0,
@@ -4022,6 +4117,9 @@ class FurnitureProxy:
             "TallZonesJSON",
             "WallFrontDrop",
             "ExtendedSides",
+            "TopReinforcementMode",
+            "TopReinforcementSize",
+            "ShowLowerPlinth",
             "CornerOpeningWidth",
             "BlindSide",
             "SimpleCornerOpeningSide",
@@ -4321,6 +4419,9 @@ def create_furniture(
     blind_mate_depth=600.0,
     blind_side="Left",
     simple_corner_opening_side="Right",
+    top_reinforcement_mode="Horizontal",
+    top_reinforcement_size=100.0,
+    show_lower_plinth=True,
 ):
     """Create one universal Cabinet object."""
 
@@ -4361,6 +4462,9 @@ def create_furniture(
         blind_mate_depth=blind_mate_depth,
         blind_side=blind_side,
         simple_corner_opening_side=simple_corner_opening_side,
+        top_reinforcement_mode=top_reinforcement_mode,
+        top_reinforcement_size=top_reinforcement_size,
+        show_lower_plinth=show_lower_plinth,
     )
 
     FurnitureViewProvider(

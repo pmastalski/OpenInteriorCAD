@@ -375,7 +375,10 @@ class EditFurnitureCommand:
                 "edit_furniture.svg"
             ),
             "MenuText": "Edit Furniture",
-            "ToolTip": "Edit dimensions, position and rotation.",
+            "ToolTip": (
+                "Open the persistent furniture editor. "
+                "Changes apply live; select another cabinet to continue editing."
+            ),
         }
 
     def IsActive(

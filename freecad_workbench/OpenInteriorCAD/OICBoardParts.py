@@ -282,19 +282,6 @@ def _standard_parts(obj):
             edge_front=True,
         ),
         _part(
-            "Top",
-            "Top",
-            max(0.0, W - 2.0 * T),
-            carcass_depth,
-            T,
-            board,
-            edge_material=edge,
-            edge_thickness=edge_t,
-            edge_length=max(0.0, W - 2.0 * T),
-            edge_count=1,
-            edge_front=True,
-        ),
-        _part(
             "Back",
             "Back",
             W,
@@ -303,6 +290,60 @@ def _standard_parts(obj):
             back,
         ),
     ]
+
+    if cabinet_type == "Base":
+        rail_size = max(
+            T,
+            min(
+                _mm(getattr(obj, "TopReinforcementSize", 100.0)),
+                carcass_depth / 2.0,
+            ),
+        )
+        if str(getattr(obj, "TopReinforcementMode", "Horizontal")) == "Vertical":
+            rail_height = max(
+                T,
+                min(
+                    _mm(getattr(obj, "TopReinforcementSize", 100.0)),
+                    body_h,
+                ),
+            )
+            parts.append(_part(
+                "Top Reinforcement Front", "Reinforcement",
+                max(0.0, W - 2.0 * T), rail_height, T, board,
+                quantity=1, edge_material=edge, edge_thickness=edge_t,
+                edge_length=max(0.0, W - 2.0 * T), edge_count=1,
+                edge_front=True,
+            ))
+            parts.append(_part(
+                "Top Reinforcement Back", "Reinforcement",
+                max(0.0, W - 2.0 * T), rail_height, T, board,
+                quantity=1, edge_material=edge, edge_thickness=edge_t,
+                edge_length=max(0.0, W - 2.0 * T), edge_count=1,
+                edge_front=True,
+            ))
+        else:
+            parts.append(_part(
+                "Top Reinforcement Front", "Reinforcement",
+                max(0.0, W - 2.0 * T), rail_size, T, board,
+                quantity=1, edge_material=edge, edge_thickness=edge_t,
+                edge_length=max(0.0, W - 2.0 * T), edge_count=1,
+                edge_front=True,
+            ))
+            parts.append(_part(
+                "Top Reinforcement Back", "Reinforcement",
+                max(0.0, W - 2.0 * T), rail_size, T, board,
+                quantity=1, edge_material=edge, edge_thickness=edge_t,
+                edge_length=max(0.0, W - 2.0 * T), edge_count=1,
+                edge_front=True,
+            ))
+    else:
+        parts.append(_part(
+            "Top", "Top",
+            max(0.0, W - 2.0 * T), carcass_depth, T, board,
+            edge_material=edge, edge_thickness=edge_t,
+            edge_length=max(0.0, W - 2.0 * T), edge_count=1,
+            edge_front=True,
+        ))
 
     tall_zones = (
         tall_zone_layout(str(getattr(obj, "TallZonesJSON", "")), H, plinth, T)
@@ -344,7 +385,7 @@ def _standard_parts(obj):
             )
         )
 
-    if plinth > 0.0:
+    if plinth > 0.0 and bool(getattr(obj, "ShowLowerPlinth", True)):
         plinth_length = max(0.0, W - T * int(left_ext) - T * int(right_ext))
 
         parts.append(
